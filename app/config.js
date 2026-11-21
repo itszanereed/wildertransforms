@@ -7,5 +7,8 @@
 // ============================================================
 window.WT_CONFIG = {
   SUPABASE_URL: 'https://mfvyflsbxrlntefyijsa.supabase.co',          // looks like https://abcdefgh.supabase.co
-  SUPABASE_ANON_KEY: 'sb_publishable_to00y7Y6NEuWglMEw56jRg_G19xDaxO' // long key starting with eyJ... (or sb_publishable_...)
+  SUPABASE_ANON_KEY: 'sb_publishable_to00y7Y6NEuWglMEw56jRg_G19xDaxO', // long key starting with eyJ... (or sb_publishable_...)
+  // Stripe → Settings → Billing → Customer portal → "Login link" (starts with https://billing.stripe.com/p/login/...)
+  // Leave '' to hide the Manage Billing button.
+  BILLING_PORTAL_URL: ''
 };
