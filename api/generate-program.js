@@ -182,12 +182,20 @@ export async function POST(request) {
   let body = {};
   try { body = await request.json(); } catch { /* client calls may send no body */ }
 
-  // Coach can draft for anyone; a client can only trigger their own FIRST draft.
-  const targetId = me.is_coach && body.user_id ? body.user_id : me.id;
-  if (!me.is_coach) {
+  // Coach can draft for anyone; a client (or the coach testing on himself) can only trigger their own draft,
+  // and only if they don't have one yet, or the last attempt failed / got stuck.
+  const coachRun = me.is_coach && !!body.user_id;
+  const targetId = coachRun ? body.user_id : me.id;
+  let firstSubmit = false;
+  if (!coachRun) {
     if (!me.active) return json({ error: 'Inactive' }, 403);
-    const existing = await sb(`/rest/v1/programs?select=id&user_id=eq.${targetId}&status=in.(generating,draft,published)&limit=1`);
-    if (existing.length) return json({ ok: true, skipped: 'already has a program' });
+    const rows = await sb(`/rest/v1/programs?select=id,status,updated_at&user_id=eq.${targetId}&status=neq.archived&order=created_at.desc&limit=1`);
+    const last = rows[0];
+    const stale = last && Date.now() - new Date(last.updated_at).getTime() > 5 * 60 * 1000;
+    if (last && (last.status === 'draft' || last.status === 'published')) return json({ ok: true, skipped: 'already has a program' });
+    if (last && last.status === 'generating' && !stale) return json({ ok: true, skipped: 'already drafting' });
+    if (last && last.status === 'failed' && !stale) return json({ ok: true, skipped: 'failed recently' });
+    firstSubmit = !last;
   }
 
   const [client] = await sb(`/rest/v1/profiles?select=id,full_name,email&id=eq.${targetId}`);
@@ -199,6 +207,10 @@ export async function POST(request) {
   if (age && age < 18) {
     await telegram(`⚠️ <b>${esc(client.full_name || client.email)}</b> entered an age under 18. No AI draft was made. Review manually.`);
     return json({ error: 'Client is under 18. Program not drafted automatically.' }, 400);
+  }
+
+  if (firstSubmit) {
+    await telegram(`📋 <b>${esc(client.full_name || client.email)}</b> submitted their training questionnaire.\nDrafting their program now. You'll get another ping when it's ready to review.`);
   }
 
   // Reuse their current draft row if there is one, otherwise start a new one.
@@ -224,13 +236,14 @@ export async function POST(request) {
       method: 'PATCH',
       body: JSON.stringify({ status: 'draft', title: program.title, data: clientFacing, ai_notes: coach_notes || null, updated_at: new Date().toISOString() }),
     });
-    if (!me.is_coach) {
+    if (!coachRun) {
       await telegram(`📝 <b>Program draft ready</b>\n${esc(client.full_name || client.email)} finished their questionnaire.\nReview and publish it in the app's Coach tab.`);
     }
     return json({ ok: true, program_id: rowId });
   } catch (err) {
     console.error(err);
     await sb(`/rest/v1/programs?id=eq.${rowId}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error: String(err.message).slice(0, 500), updated_at: new Date().toISOString() }) }).catch(() => {});
+    if (!coachRun) await telegram(`❌ <b>Program draft failed</b> for ${esc(client.full_name || client.email)}\n${esc(String(err.message).slice(0, 200))}\nOpen the Coach tab and tap Generate to retry.`);
     return json({ error: 'Draft failed. Try Generate again.' }, 502);
   }
 }

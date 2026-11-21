@@ -46,12 +46,18 @@ export async function POST(request) {
 
   let body = {};
   try { body = await request.json(); } catch { /* no body */ }
-  const targetId = me.is_coach && body.user_id ? body.user_id : me.id;
-
-  if (!me.is_coach) {
+  const coachRun = me.is_coach && !!body.user_id;
+  const targetId = coachRun ? body.user_id : me.id;
+  let firstSubmit = false;
+  if (!coachRun) {
     if (!me.active) return json({ error: 'Inactive' }, 403);
-    const existing = await sb(`/rest/v1/protocols?select=id&user_id=eq.${targetId}&status=in.(generating,draft,published)&limit=1`);
-    if (existing.length) return json({ ok: true, skipped: 'already has a protocol' });
+    const rows = await sb(`/rest/v1/protocols?select=id,status,updated_at&user_id=eq.${targetId}&status=neq.archived&order=created_at.desc&limit=1`);
+    const last = rows[0];
+    const stale = last && Date.now() - new Date(last.updated_at).getTime() > 5 * 60 * 1000;
+    if (last && (last.status === 'draft' || last.status === 'published')) return json({ ok: true, skipped: 'already has a protocol' });
+    if (last && last.status === 'generating' && !stale) return json({ ok: true, skipped: 'already drafting' });
+    if (last && last.status === 'failed' && !stale) return json({ ok: true, skipped: 'failed recently' });
+    firstSubmit = !last;
   }
 
   const [client] = await sb(`/rest/v1/profiles?select=id,full_name,email&id=eq.${targetId}`);
@@ -72,6 +78,8 @@ export async function POST(request) {
     await telegram(`⚠️ <b>${esc(name)}</b> is pregnant or breastfeeding. No supplement protocol was drafted. They should get supplement guidance from their doctor.`);
     return json({ error: 'Client is pregnant or breastfeeding. Supplement guidance should come from their doctor.' }, 400);
   }
+
+  if (firstSubmit) await telegram(`📋 <b>${esc(name)}</b> submitted their supplement questions.\nBuilding their protocol now. You'll get another ping when it's ready to review.`);
 
   const [draftRow] = await sb(`/rest/v1/protocols?select=id,data&user_id=eq.${targetId}&status=in.(generating,draft,failed)&order=created_at.desc&limit=1`);
   const previous = body.instructions && draftRow?.data ? draftRow.data : null;
@@ -103,11 +111,12 @@ Return the protocol as JSON in the required format. No other text.`;
     const items = p.items.map((it) => ({ ...it, link: allowed.has(it.link) ? it.link : '', timing: TIMINGS.includes(it.timing) ? it.timing : 'Any time' }));
     const data = { summary: p.summary, items, total_est_monthly_cost: items.reduce((s, it) => s + (Number(it.est_monthly_cost) || 0), 0) };
     await sb(`/rest/v1/protocols?id=eq.${rowId}`, { method: 'PATCH', body: JSON.stringify({ status: 'draft', data, ai_notes: p.coach_notes || null, updated_at: new Date().toISOString() }) });
-    if (!me.is_coach) await telegram(`💊 <b>Supplement protocol ready</b>\n${esc(name)} finished the supplement questions.\nReview and publish it in the Coach tab.`);
+    if (!coachRun) await telegram(`💊 <b>Supplement protocol ready</b>\n${esc(name)} finished the supplement questions.\nReview and publish it in the Coach tab.`);
     return json({ ok: true, protocol_id: rowId });
   } catch (err) {
     console.error(err);
     await sb(`/rest/v1/protocols?id=eq.${rowId}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', error: String(err.message).slice(0, 500), updated_at: new Date().toISOString() }) }).catch(() => {});
+    if (!coachRun) await telegram(`❌ <b>Supplement protocol failed</b> for ${esc(name)}\n${esc(String(err.message).slice(0, 200))}\nOpen the Coach tab and tap Generate to retry.`);
     return json({ error: 'Generating failed. Try again.' }, 502);
   }
 }
