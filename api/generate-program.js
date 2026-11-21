@@ -119,33 +119,55 @@ async function draftWithClaude({ name, answers, instructions, previous }) {
 You draft personalized training programs that Zane reviews and edits before his client ever sees them.
 Follow Zane's coaching rules exactly:
 ${COACHING_RULES}
-Always respond by calling the save_program tool.`;
+Return the program as JSON matching the required format (or by calling the save_program tool if it is offered). No other text.`;
 
   let user = `Draft a program for this client.\n\nClient name: ${name || 'Client'}\n\nQuestionnaire answers:\n${JSON.stringify(answers, null, 2)}`;
   if (previous) user += `\n\nZane's current draft (revise this, keep what he didn't ask to change):\n${JSON.stringify(previous, null, 2)}`;
   if (instructions) user += `\n\nZane's instructions for this version (these take priority):\n${instructions}`;
 
+  const base = { model: MODEL(), max_tokens: 12000, system, messages: [{ role: 'user', content: user }] };
+
+  // 1) Structured output: Claude must return JSON matching the program schema.
+  let r = await callClaude({ ...base, output_config: { format: { type: 'json_schema', schema: strictSchema(PROGRAM_TOOL.input_schema) } } });
+  if (r.ok) { const p = parseProgram(textOf(r.data)); if (p) return p; }
+
+  // 2) Backup: offer the save_program tool (no forcing) and ask Claude to use it.
+  if (!r.ok && r.status !== 400) throw new Error(r.error);
+  r = await callClaude({ ...base, tools: [PROGRAM_TOOL], tool_choice: { type: 'auto' } });
+  if (!r.ok) throw new Error(r.error);
+  const block = (r.data.content || []).find((b) => b.type === 'tool_use' && b.name === 'save_program');
+  if (block?.input?.days?.length) return block.input;
+
+  // 3) Last resort: pull JSON out of a plain text answer.
+  const p = parseProgram(textOf(r.data));
+  if (p) return p;
+  throw new Error('Claude did not return a program');
+}
+
+async function callClaude(body) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'x-api-key': env('ANTHROPIC_API_KEY'),
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL(),
-      max_tokens: 8000,
-      system,
-      tools: [PROGRAM_TOOL],
-      tool_choice: { type: 'tool', name: 'save_program' },
-      messages: [{ role: 'user', content: user }],
-    }),
+    headers: { 'x-api-key': env('ANTHROPIC_API_KEY'), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Claude ${res.status}: ${data?.error?.message || JSON.stringify(data)}`);
-  const block = (data.content || []).find((b) => b.type === 'tool_use' && b.name === 'save_program');
-  if (!block?.input?.days?.length) throw new Error('Claude did not return a program');
-  return block.input;
+  const data = await res.json().catch(() => ({}));
+  return res.ok ? { ok: true, data } : { ok: false, status: res.status, error: `Claude ${res.status}: ${data?.error?.message || JSON.stringify(data)}` };
+}
+const textOf = (data) => (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+function parseProgram(text) {
+  if (!text) return null;
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b < a) return null;
+  try { const p = JSON.parse(text.slice(a, b + 1)); return p?.days?.length ? p : null; } catch { return null; }
+}
+// Structured outputs want every object closed (additionalProperties:false) with all fields required.
+function strictSchema(node) {
+  if (Array.isArray(node)) return node.map(strictSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) out[k] = (k === 'description') ? v : strictSchema(v);
+  if (out.type === 'object' && out.properties) { out.additionalProperties = false; out.required = Object.keys(out.properties); }
+  return out;
 }
 
 const json = (obj, status = 200) => Response.json(obj, { status });
