@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "api/generate-program.js": { "maxDuration": 120 },
+    "api/generate-protocol.js": { "maxDuration": 120 }
+  }
+}

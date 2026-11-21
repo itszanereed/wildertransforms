@@ -188,10 +188,27 @@
   .ed-btns button{width:34px;height:40px;border-radius:9px;background:var(--card-2);color:var(--muted);font-size:15px}
   .ed-btns button.x{color:#ff8a5c}
   .sticky-actions{position:sticky;bottom:calc(var(--safe-b) + 78px);z-index:20;display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin:6px 0 14px;padding:10px;background:rgba(10,10,9,.9);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px}
+
+  /* ---- Supplement protocol ---- */
+  .proto{background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:18px;overflow:hidden}
+  .proto.cta{border-color:rgba(255,106,26,.45);background:linear-gradient(135deg,rgba(255,106,26,.12),transparent 60%),var(--card)}
+  .proto.open{border-color:rgba(255,106,26,.45)}
+  .proto-head{display:flex;justify-content:space-between;align-items:center;width:100%;padding:16px;text-align:left;gap:12px}
+  .proto-head b{display:block;font-size:16px}
+  .proto-head small{color:var(--muted);font-size:13px;line-height:1.4;display:block;margin-top:2px}
+  .proto.open .chev{transform:rotate(90deg);color:var(--accent)}
+  .proto-body{padding:0 16px 16px}
+  .shop{display:inline-block;margin-top:8px;font-size:13px;font-weight:700;color:#120800;background:var(--accent);padding:7px 12px;border-radius:999px;text-decoration:none}
+  .fine{font-size:11px;color:#7d786c;line-height:1.5;margin-top:14px}
+  .disclaimer-text{font-size:14px;line-height:1.6;color:#cfc9bb;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px;max-height:42dvh;overflow:auto}
+  .check-line{display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:14px;line-height:1.5;cursor:pointer}
+  .check-line input{width:22px;height:22px;accent-color:var(--accent);flex:0 0 auto;margin-top:1px}
+  .pills{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+  select.field{appearance:none;-webkit-appearance:none}
   .center{min-height:70dvh;display:grid;place-items:center;text-align:center}
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 14px);transform:translate(-50%,-140%);z-index:60;background:var(--card-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s}
+  .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 14px);transform:translate(-50%,-140%);max-width:calc(100vw - 32px);z-index:60;background:var(--card-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s}
   .toast.show{transform:translate(-50%,0)}
 </style>
 </head>
@@ -225,8 +242,8 @@ function makeSupabaseApi() {
     async verifyCode(email, token) { must(await sb.auth.verifyOtp({ email, token, type: 'email' })); },
     async signOut() { await sb.auth.signOut(); },
     async profile(uid) { return must(await sb.from('profiles').select('*').eq('id', uid).maybeSingle()); },
-    async supplements() { return must(await sb.from('supplements').select('id,name,dose').eq('archived', false).order('created_at')); },
-    async addSupplement(name, dose) { return must(await sb.from('supplements').insert({ name, dose: dose || null }).select('id,name,dose').single()); },
+    async supplements() { return must(await sb.from('supplements').select('id,name,dose,timing,note,link,source,created_at').eq('archived', false).order('created_at')); },
+    async addSupplement(name, dose) { return must(await sb.from('supplements').insert({ name, dose: dose || null }).select('id,name,dose,timing,note,link,source,created_at').single()); },
     async archiveSupplement(id) { must(await sb.from('supplements').update({ archived: true }).eq('id', id)); },
     async logs(from, to) { return must(await sb.from('supplement_logs').select('supplement_id,log_date').gte('log_date', from).lte('log_date', to)); },
     async setTaken(supplement_id, log_date, taken) {
@@ -255,6 +272,33 @@ function makeSupabaseApi() {
     async coachPublish(id, user_id, data) {
       must(await sb.from('programs').update({ status: 'archived' }).eq('user_id', user_id).eq('status', 'published'));
       must(await sb.from('programs').update({ status: 'published', data, title: data.title || null, ai_notes: null, published_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id));
+    },
+    // ---- Supplement protocols ----
+    async suppIntake(uid) { return must(await sb.from('supp_intakes').select('answers,created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle()); },
+    async protocol(uid) { return must(await sb.from('protocols').select('id,data,acknowledged_at,published_at').eq('user_id', uid).eq('status', 'published').order('published_at', { ascending: false }).limit(1).maybeSingle()); },
+    async submitSuppIntake(answers) { must(await sb.from('supp_intakes').insert({ answers })); },
+    async callProtocol(body, keepalive) {
+      const { data } = await sb.auth.getSession();
+      const res = await fetch('/api/generate-protocol', { method: 'POST', keepalive, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (data.session?.access_token || '') }, body: JSON.stringify(body || {}) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Generating failed');
+      return out;
+    },
+    requestProtocol() { this.callProtocol({}, true).catch(() => {}); },
+    async ackProtocol(id) { must(await sb.rpc('acknowledge_protocol', { protocol_id: id })); },
+    async coachSuppIntakes() { return must(await sb.from('supp_intakes').select('user_id,answers,created_at').order('created_at', { ascending: false })); },
+    async coachProtocols() { return must(await sb.from('protocols').select('id,user_id,status,data,ai_notes,error,acknowledged_at,published_at').neq('status', 'archived').order('created_at', { ascending: false })); },
+    async generateProtocol(user_id, instructions) { return this.callProtocol({ user_id, instructions }); },
+    async coachSaveProtocol(id, data) { must(await sb.from('protocols').update({ data, updated_at: new Date().toISOString() }).eq('id', id)); },
+    async coachCreateProtocolDraft(user_id, data) { must(await sb.from('protocols').insert({ user_id, status: 'draft', data })); },
+    async coachPublishProtocol(id, user_id, data) {
+      const existing = must(await sb.from('supplements').select('id,name').eq('user_id', user_id).eq('archived', false));
+      const plan = mergePlan(existing || [], data.items);
+      for (const u of plan.updates) { const { id: sid, ...f } = u; must(await sb.from('supplements').update(f).eq('id', sid)); }
+      if (plan.inserts.length) must(await sb.from('supplements').insert(plan.inserts.map(x => ({ ...x, user_id }))));
+      must(await sb.from('protocols').update({ status: 'archived' }).eq('user_id', user_id).eq('status', 'published'));
+      must(await sb.from('protocols').update({ status: 'published', data, ai_notes: null, acknowledged_at: null, published_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id));
+      return { added: plan.inserts.length, updated: plan.updates.length };
     }
   };
 }
@@ -273,6 +317,14 @@ function makeDemoApi() {
   const wait = (v) => new Promise(r => setTimeout(() => r(v), 150));
   const intakes = [{ user_id: 'sarah', answers: { goal: 'Build muscle', sex: 'Female', age: '27', experience: '6 months – 2 years', days: '4', session: '45–60 min', equipment: 'Full commercial gym', priorities: ['Glutes', 'Shoulders'], injuries: 'Left shoulder is cranky on overhead press' }, created_at: new Date().toISOString() }];
   const programs = [];
+  const suppIntakes = [{ user_id: 'sarah', answers: { budget: '$50–100 / month', goals: ['Recovery', 'Sleep'], current: 'none', medications: 'none', conditions: 'none', allergies_diet: 'none', caffeine: 'I handle caffeine fine', pregnant: 'No' } }];
+  const protocols = [];
+  const DEMO_PROTOCOL = { summary: 'A simple, proven stack for recovery and sleep that fits your budget.', total_est_monthly_cost: 95, items: [
+    { name: 'Creatine Monohydrate', dose: '5 g daily', timing: 'Morning', purpose: 'More strength and better recovery between sessions.', est_monthly_cost: 15, link: 'https://example.com/creatine' },
+    { name: 'Whey Protein Isolate', dose: '1 scoop as needed to hit protein', timing: 'Post-workout', purpose: 'Makes hitting your protein target easy.', est_monthly_cost: 45, link: '' },
+    { name: 'Vitamin D3 + K2', dose: '2,000 IU daily', timing: 'With breakfast', purpose: 'Most people are low, especially in winter.', est_monthly_cost: 10, link: '' },
+    { name: 'Magnesium Glycinate', dose: '300 mg', timing: 'Before bed', purpose: 'Helps you wind down and sleep deeper.', est_monthly_cost: 15, link: '' },
+    { name: 'Fish Oil (Omega-3)', dose: '2 g EPA+DHA with food', timing: 'With dinner', purpose: 'Joint and heart health.', est_monthly_cost: 20, link: '' }] };
   const DEMO_PROGRAM = { title: 'Upper/Lower Build, Phase 1', overview: 'Four days a week, built around your glute and shoulder priorities. Every session fits inside an hour.', duration_weeks: 6, progression: 'Double progression: hit the top of the rep range on every set at the target RIR, then add weight next time. Week 6 is a deload.', cardio: '8k steps daily. 2 x 20 min incline walks per week.', days: [
     { name: 'Day 1: Lower (Glute focus)', focus: 'Glutes, hamstrings', warmup: '5 min bike, glute bridges 2x15', exercises: [
       { name: 'Hip Thrust', sets: 4, reps: '8-10', rest: '2 min', rir: '2', notes: 'Pause 1 sec at the top.' },
@@ -318,6 +370,32 @@ function makeDemoApi() {
     async coachPublish(id, user_id, data) {
       programs.forEach(p => { if (p.user_id === user_id && p.status === 'published') p.status = 'archived'; });
       Object.assign(programs.find(p => p.id === id), { status: 'published', data, title: data.title, ai_notes: null, published_at: new Date().toISOString() });
+    },
+    async suppIntake(uid) { return suppIntakes.find(x => x.user_id === uid) || null; },
+    async protocol(uid) { return protocols.find(p => p.user_id === uid && p.status === 'published') || null; },
+    async submitSuppIntake(answers) { suppIntakes.unshift({ user_id: 'demo', answers }); },
+    requestProtocol() { setTimeout(() => this.generateProtocol('demo').catch(() => {}), 50); },
+    async ackProtocol(id) { protocols.find(p => p.id === id).acknowledged_at = new Date().toISOString(); },
+    async coachSuppIntakes() { return suppIntakes; },
+    async coachProtocols() { return protocols.filter(p => p.status !== 'archived'); },
+    async generateProtocol(user_id) {
+      let row = protocols.find(p => p.user_id === user_id && ['draft', 'failed', 'generating'].includes(p.status));
+      if (!row) { row = { id: 'r' + (++n), user_id }; protocols.unshift(row); }
+      row.status = 'generating'; await wait(); await wait();
+      Object.assign(row, { status: 'draft', data: structuredClone(DEMO_PROTOCOL), ai_notes: 'Client listed no medications. Budget is $50–100, total comes to about $95.' });
+      return { ok: true };
+    },
+    async coachSaveProtocol(id, data) { protocols.find(p => p.id === id).data = data; },
+    async coachCreateProtocolDraft(user_id, data) { protocols.unshift({ id: 'r' + (++n), user_id, status: 'draft', data: structuredClone(data) }); },
+    async coachPublishProtocol(id, user_id, data) {
+      const plan = mergePlan(user_id === 'demo' ? sups : [], data.items);
+      if (user_id === 'demo') {
+        plan.updates.forEach(u => Object.assign(sups.find(x => x.id === u.id), u));
+        plan.inserts.forEach(x => sups.push({ id: 's' + (++n), ...x }));
+      }
+      protocols.forEach(p => { if (p.user_id === user_id && p.status === 'published') p.status = 'archived'; });
+      Object.assign(protocols.find(p => p.id === id), { status: 'published', data, ai_notes: null, acknowledged_at: null, published_at: new Date().toISOString() });
+      return { added: plan.inserts.length, updated: plan.updates.length };
     }
   };
 }
@@ -327,14 +405,14 @@ const api = DEMO ? makeDemoApi() : makeSupabaseApi();
 /* ==========================================================
    STATE + RENDERING
    ========================================================== */
-const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null };
+const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null };
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = (id, d) => id + '|' + d;
 
 function toast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), msg.length > 60 ? 9000 : 2200);
 }
 const demoBar = () => DEMO ? `<div class="demo">Demo mode: sample data only. Add your Supabase keys in config.js to go live.</div>` : '';
 
@@ -457,6 +535,8 @@ function dayLabel(d) {
   return new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long' });
 }
 function viewToday() {
+  if (Q.on && Q.kind === 'supps') return viewQuestion();
+  if (S.protocol && !S.protocol.acknowledged_at) return viewDisclaimer();
   const d = S.date, total = S.sups.length;
   const done = S.sups.filter(s => S.logs.has(key(s.id, d))).length;
   const pct = total ? done / total : 0, C = 2 * Math.PI * 42;
@@ -482,19 +562,23 @@ function viewToday() {
         <div class="msg">${msg}</div>
       </div>
     </div>
+    ${protocolCard()}
     <div class="sec"><h2>Supplements</h2><button class="link" id="edit">${total ? 'Edit' : '+ Add'}</button></div>
     <div class="list">
-      ${total ? S.sups.map(s => {
+      ${total ? S.sups.slice().sort((a, b) => timingIdx(a.timing) - timingIdx(b.timing)).map(s => {
         const on = S.logs.has(key(s.id, d));
         return `<button class="row ${on ? 'on' : ''}" data-sup="${s.id}">
           <span class="box">${ICON.check}</span>
-          <span><div class="name">${esc(s.name)}</div>${s.dose ? `<div class="dose">${esc(s.dose)}</div>` : ''}</span>
+          <span><div class="name">${esc(s.name)}</div>${s.dose || s.timing ? `<div class="dose">${esc([s.dose, s.timing].filter(Boolean).join(' · '))}</div>` : ''}</span>
         </button>`;
       }).join('') : `<div class="empty"><b>No supplements yet</b>Tap "+ Add" and enter the stack your coach gave you.</div>`}
     </div>`;
 }
 function bindToday() {
   if (S.tab !== 'today') return;
+  if (Q.on && Q.kind === 'supps') return bindQuestion();
+  bindProtocolClient();
+  if (S.protocol && !S.protocol.acknowledged_at) return;
   document.getElementById('prev').onclick = () => { S.date = addDays(S.date, -1); renderShell(); };
   document.getElementById('next').onclick = () => { if (S.date < TODAY()) { S.date = addDays(S.date, 1); renderShell(); } };
   document.getElementById('edit').onclick = () => openSheet(true);
@@ -533,6 +617,8 @@ function bindSheet() {
   document.getElementById('supAdd').onclick = async () => {
     const name = document.getElementById('supName').value.trim(), dose = document.getElementById('supDose').value.trim();
     if (!name) return toast('Enter a supplement name');
+    const dupe = S.sups.find(x => sameSupp(x.name, name));
+    if (dupe) return toast(`${dupe.name} is already in your stack`);
     try { const s = await api.addSupplement(name, dose); S.sups.push(s); computeStreak(); openSheet(true); toast(`${name} added`); }
     catch (e) { toast('Couldn\'t add it. Try again.'); }
   };
@@ -562,10 +648,11 @@ const QUESTIONS = [
   { k: 'activity', q: 'How active are you outside the gym?', type: 'choice', opts: ['Mostly sitting (desk job)', 'On my feet some of the day', 'Very active job / lots of walking'] },
   { k: 'extra', q: 'Anything else I should know?', type: 'textarea', ph: "Schedule, sports, past programs, what's held you back…", optional: true },
 ];
-const Q = { on: false, i: 0, a: {} };
+const Q = { on: false, i: 0, a: {}, kind: 'training', set: QUESTIONS, submit: null };
+function startQuestions(kind, set, submit) { Object.assign(Q, { on: true, i: 0, a: {}, kind, set, submit }); renderShell(); window.scrollTo(0, 0); }
 
 function viewProgram() {
-  if (Q.on) return viewQuestion();
+  if (Q.on && Q.kind === 'training') return viewQuestion();
   if (S.program) return viewPublished(S.program);
   if (S.intake) return `
     <div class="hero-card">
@@ -589,7 +676,7 @@ function viewProgram() {
 }
 
 function viewQuestion() {
-  const q = QUESTIONS[Q.i], v = Q.a[q.k], last = Q.i === QUESTIONS.length - 1;
+  const q = Q.set[Q.i], v = Q.a[q.k], last = Q.i === Q.set.length - 1;
   let input = '';
   if (q.type === 'choice') input = `<div class="opts">${q.opts.map(o => `<button class="opt ${v === o ? 'on' : ''}" data-opt="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
   if (q.type === 'multi') input = `<div class="opts">${q.opts.map(o => `<button class="opt ${(v || []).includes(o) ? 'on' : ''}" data-multi="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
@@ -597,8 +684,8 @@ function viewQuestion() {
   if (q.type === 'textarea') input = `<textarea class="field" id="qIn" rows="4" placeholder="${esc(q.ph || '')}">${esc(v || '')}</textarea>`;
   const needsNext = q.type !== 'choice';
   return `
-    <div class="qbar"><div style="width:${((Q.i + 1) / QUESTIONS.length) * 100}%"></div></div>
-    <div class="qhead"><button class="link" id="qBack">${Q.i ? '‹ Back' : '✕ Cancel'}</button><span class="muted" style="font-size:13px">${Q.i + 1} of ${QUESTIONS.length}</span></div>
+    <div class="qbar"><div style="width:${((Q.i + 1) / Q.set.length) * 100}%"></div></div>
+    <div class="qhead"><button class="link" id="qBack">${Q.i ? '‹ Back' : '✕ Cancel'}</button><span class="muted" style="font-size:13px">${Q.i + 1} of ${Q.set.length}</span></div>
     <h2 class="qtitle">${esc(q.q)}</h2>${q.sub ? `<p class="muted" style="margin:-6px 0 14px">${esc(q.sub)}</p>` : ''}
     ${input}
     ${needsNext || last ? `<button class="btn btn-primary" id="qNext" style="margin-top:18px">${last ? 'Submit' : 'Next'}</button>` : ''}
@@ -609,15 +696,17 @@ function viewQuestion() {
 function bindProgram() {
   if (S.tab !== 'program') return;
   const start = document.getElementById('qStart');
-  if (start) start.onclick = () => { Q.on = true; Q.i = 0; renderShell(); window.scrollTo(0, 0); };
-  if (!Q.on) { bindPublished(); return; }
+  if (start) start.onclick = () => startQuestions('training', QUESTIONS, submitIntake);
+  if (Q.on && Q.kind === 'training') bindQuestion(); else bindPublished();
+}
 
-  const q = QUESTIONS[Q.i];
+function bindQuestion() {
+  const q = Q.set[Q.i], n = Q.set.length;
   const go = (dir) => { Q.i += dir; renderShell(); window.scrollTo(0, 0); setTimeout(() => document.getElementById('qIn')?.focus(), 50); };
   document.getElementById('qBack').onclick = () => { if (Q.i === 0) { Q.on = false; renderShell(); } else go(-1); };
   document.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => {
     Q.a[q.k] = b.dataset.opt;
-    if (Q.i === QUESTIONS.length - 1) renderShell(); else go(1);
+    if (Q.i === n - 1) renderShell(); else go(1);
   });
   document.querySelectorAll('[data-multi]').forEach(b => b.onclick = () => {
     const cur = Q.a[q.k] || [], o = b.dataset.multi;
@@ -629,14 +718,14 @@ function bindProgram() {
   const input = document.getElementById('qIn');
   if (input) { input.oninput = () => { Q.a[q.k] = input.value; }; if (input.tagName === 'INPUT') input.onkeydown = e => { if (e.key === 'Enter') document.getElementById('qNext')?.click(); }; }
   const skip = document.getElementById('qSkip');
-  if (skip) skip.onclick = () => { delete Q.a[q.k]; Q.i === QUESTIONS.length - 1 ? submitIntake() : go(1); };
+  if (skip) skip.onclick = () => { delete Q.a[q.k]; Q.i === n - 1 ? Q.submit() : go(1); };
   const next = document.getElementById('qNext');
   if (next) next.onclick = () => {
     const v = Q.a[q.k];
     const empty = v == null || (Array.isArray(v) ? !v.length : !String(v).trim());
     if (empty && !q.optional) return renderErr('Answer this one to continue.');
     if (q.k === 'age' && !(Number(v) >= 13 && Number(v) <= 99)) return renderErr('Enter your age in years.');
-    Q.i === QUESTIONS.length - 1 ? submitIntake() : go(1);
+    Q.i === n - 1 ? Q.submit() : go(1);
   };
 }
 
@@ -698,7 +787,7 @@ function bindPublished() {
 /* ==========================================================
    COACH TAB: review AI drafts, edit, regenerate, publish
    ========================================================== */
-const C = { clients: [], programs: {}, intakes: {}, sel: null, edit: null, poll: null, loaded: false };
+const C = { clients: [], programs: {}, intakes: {}, protocols: {}, suppIntakes: {}, sel: null, edit: null, sedit: null, poll: null, loaded: false };
 
 function clientStatus(c) {
   const ps = C.programs[c.id] || [];
@@ -711,7 +800,9 @@ function clientStatus(c) {
   return ['No questionnaire', ''];
 }
 async function loadCoach() {
-  const [clients, programs, intakes] = await Promise.all([api.coachClients(), api.coachPrograms(), api.coachIntakes()]);
+  const [clients, programs, intakes, protocols, suppIntakes] = await Promise.all([api.coachClients(), api.coachPrograms(), api.coachIntakes(), api.coachProtocols().catch(() => []), api.coachSuppIntakes().catch(() => [])]);
+  C.protocols = {}; (protocols || []).forEach(p => (C.protocols[p.user_id] ||= []).push(p));
+  C.suppIntakes = {}; (suppIntakes || []).forEach(i => { if (!C.suppIntakes[i.user_id]) C.suppIntakes[i.user_id] = i; });
   C.clients = clients || [];
   C.programs = {}; (programs || []).forEach(p => (C.programs[p.user_id] ||= []).push(p));
   C.intakes = {}; (intakes || []).forEach(i => { if (!C.intakes[i.user_id]) C.intakes[i.user_id] = i; });
@@ -721,16 +812,16 @@ function viewCoach() {
   if (!C.loaded) return `<div class="center" style="min-height:40dvh"><div class="spin"></div></div>`;
   if (C.sel) return viewCoachClient();
   const order = { hot: 0, bad: 1, warn: 2, '': 3, good: 4 };
-  const rows = C.clients.filter(c => c.id !== S.user.id || C.intakes[c.id])
-    .map(c => ({ c, st: clientStatus(c) }))
-    .sort((a, b) => order[a.st[1]] - order[b.st[1]]);
+  const rows = C.clients.filter(c => c.id !== S.user.id || C.intakes[c.id] || C.suppIntakes[c.id])
+    .map(c => ({ c, st: clientStatus(c), ss: suppStatus(c) }))
+    .sort((a, b) => Math.min(order[a.st[1]], a.ss ? order[a.ss[1]] : 9) - Math.min(order[b.st[1]], b.ss ? order[b.ss[1]] : 9));
   return `
     <div class="sec"><h2>Clients</h2><button class="link" id="cRefresh">Refresh</button></div>
     <div class="list">
-      ${rows.map(({ c, st }) => `
+      ${rows.map(({ c, st, ss }) => `
         <button class="row client" data-client="${c.id}">
           <span style="flex:1;min-width:0"><div class="name">${esc(c.full_name || c.email)}</div><div class="dose">${esc(c.tier ? (c.tier === 'transformation' ? 'Transformation' : 'Fitness') : 'No tier')}${c.active ? '' : ' · inactive'}</div></span>
-          <span class="pill ${st[1]}">${st[0]}</span>
+          <span class="pills"><span class="pill ${st[1]}">${st[0]}</span>${ss ? `<span class="pill ${ss[1]}">${ss[0]}</span>` : ''}</span>
         </button>`).join('') || '<div class="empty"><b>No clients yet</b>Clients show up here once they\'re added.</div>'}
     </div>`;
 }
@@ -745,28 +836,28 @@ function viewCoachClient() {
 
   let programPart = '';
   if (draft?.status === 'generating') {
-    programPart = `<div class="card center" style="min-height:160px"><div><div class="spin" style="margin:0 auto 14px"></div><b>AI is drafting the program…</b><div class="muted" style="font-size:13px;margin-top:6px">Usually under a minute. This updates on its own.</div></div></div>`;
+    programPart = `<div class="card center" style="min-height:160px"><div><div class="spin" style="margin:0 auto 14px"></div><b>Generating program…</b><div class="muted" style="font-size:13px;margin-top:6px">Usually under a minute. This updates on its own.</div></div></div>`;
   } else if (draft?.status === 'failed' && !(C.edit?.days || []).length) {
-    programPart = `<div class="notice bad">The AI draft failed: ${esc(draft.error || 'unknown error')}</div><button class="btn btn-primary" id="cGen">Try Generate Again</button>`;
+    programPart = `<div class="notice bad">Generating failed: ${esc(draft.error || 'unknown error')}</div><button class="btn btn-primary" id="cGen">Try Generating Again</button>`;
   } else if (draft && C.edit) {
     programPart = `
-      ${draft.status === 'failed' ? `<div class="notice bad">Last draft failed: ${esc(draft.error || 'unknown error')}. Try Generate again.</div>` : ''}
-      ${draft.ai_notes ? `<div class="notice"><b>AI notes for you</b> (the client never sees these)<br>${esc(draft.ai_notes)}</div>` : ''}
+      ${draft.status === 'failed' ? `<div class="notice bad">Last attempt failed: ${esc(draft.error || 'unknown error')}. Try generating again.</div>` : ''}
+      ${draft.ai_notes ? `<div class="notice"><b>Notes for you</b> (the client never sees these)<br>${esc(draft.ai_notes)}</div>` : ''}
       ${editorHtml(C.edit)}
       <div class="sticky-actions">
         <button class="btn btn-ghost" id="cSave">Save Draft</button>
         <button class="btn btn-primary" id="cPublish">Publish to Client</button>
       </div>
-      <div class="card"><div class="k">Regenerate with AI</div>
+      <div class="card"><div class="k">Rework this program</div>
         <textarea class="field" id="cInstr" rows="3" style="margin-top:10px" placeholder='e.g. "More glute volume, swap barbell squats for leg press, keep Day 3 the same"'></textarea>
-        <button class="btn btn-ghost" id="cRegen" style="margin-top:10px">Regenerate Draft</button>
-        <p class="muted" style="font-size:12px;margin-top:8px">Uses your notes plus the current draft. Unsaved edits above are included.</p>
+        <button class="btn btn-ghost" id="cRegen" style="margin-top:10px">Regenerate Program</button>
+        <p class="muted" style="font-size:12px;margin-top:8px">Keeps everything you didn\'t ask to change. Unsaved edits above are included.</p>
       </div>`;
   } else {
     programPart = `
       ${pub ? `<div class="card"><div class="k">Published program</div><div class="v">${esc(pub.title || 'Program')}</div><div class="muted" style="font-size:13px;margin-top:4px">Published ${pub.published_at ? new Date(pub.published_at).toLocaleDateString() : ''}</div>
         <button class="btn btn-ghost" id="cEditPub" style="margin-top:12px">Edit as New Version</button></div>` : ''}
-      ${intake ? `<button class="btn btn-primary" id="cGen">${pub ? 'Generate New Program with AI' : 'Generate Draft with AI'}</button>`
+      ${intake ? `<button class="btn btn-primary" id="cGen">${pub ? 'Generate New Program' : 'Generate Program'}</button>`
         : `<div class="empty"><b>Waiting on their questionnaire</b>They'll see it the first time they open the Program tab.</div>`}`;
   }
 
@@ -780,7 +871,8 @@ function viewCoachClient() {
       <div class="answers">${Object.entries(intake.answers || {}).map(([k, v]) => `<div><span>${esc(label(k))}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}</div>
     </details>` : ''}
     <div class="sec" style="margin-top:18px"><h2>Program</h2>${draft && draft.status !== 'generating' ? `<span class="pill hot">Draft, not visible to client</span>` : ''}</div>
-    ${programPart}`;
+    ${programPart}
+    ${viewCoachSupps(c)}`;
 }
 
 /* ----- Editor ----- */
@@ -831,9 +923,10 @@ function startPoll() {
   C.poll = setInterval(async () => {
     n++;
     try { await loadCoach(); } catch (e) {}
-    const ps = C.programs[C.sel] || [];
-    const d = ps.find(p => ['draft', 'generating', 'failed'].includes(p.status));
-    if (!d || d.status !== 'generating' || n > 40) { stopPoll(); C.edit = d && d.data ? structuredClone(d.data) : C.edit; }
+    const d = (C.programs[C.sel] || []).find(p => ['draft', 'generating', 'failed'].includes(p.status));
+    const sd = (C.protocols[C.sel] || []).find(p => ['draft', 'generating', 'failed'].includes(p.status));
+    const busy = d?.status === 'generating' || sd?.status === 'generating';
+    if (!busy || n > 40) { stopPoll(); C.edit = C.edit || (d?.data ? structuredClone(d.data) : null); C.sedit = C.sedit || (sd?.data ? structuredClone(sd.data) : null); }
     if (S.tab === 'coach') renderShell();
   }, 5000);
 }
@@ -849,7 +942,7 @@ async function generate(instructions) {
     await loadCoach();
     const nd = (C.programs[c] || []).find(p => p.status === 'draft');
     C.edit = nd?.data ? structuredClone(nd.data) : null;
-    stopPoll(); renderShell(); toast('Draft ready');
+    stopPoll(); renderShell(); toast('Program ready to review');
   } catch (e) {
     stopPoll(); await loadCoach().catch(() => {}); renderShell();
     toast(e.message || 'Draft failed');
@@ -865,12 +958,15 @@ function bindCoach() {
       C.sel = b.dataset.client;
       const d = (C.programs[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
       C.edit = d?.data ? structuredClone(d.data) : (d ? { title: '', overview: '', days: [] } : null);
-      if ((C.programs[C.sel] || []).some(p => p.status === 'generating')) startPoll();
+      const sd = (C.protocols[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
+      C.sedit = sd?.data ? structuredClone(sd.data) : (sd ? { summary: '', items: [] } : null);
+      if ((C.programs[C.sel] || []).some(p => p.status === 'generating') || (C.protocols[C.sel] || []).some(p => p.status === 'generating')) startPoll();
       renderShell(); window.scrollTo(0, 0);
     });
     return;
   }
-  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; renderShell(); };
+  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; C.sedit = null; renderShell(); };
+  bindCoachSupps();
   $('cGen') && ($('cGen').onclick = () => generate(''));
   $('cEditPub') && ($('cEditPub').onclick = async () => {
     const pub = (C.programs[C.sel] || []).find(p => p.status === 'published');
@@ -904,10 +1000,220 @@ function bindCoach() {
   });
   $('cRegen') && ($('cRegen').onclick = async () => {
     const instr = $('cInstr').value.trim();
-    if (!instr) return toast('Tell the AI what to change');
+    if (!instr) return toast('Type what you want changed');
     try { await api.coachSaveDraft(draftRow().id, clean()); } catch (e) {}
     generate(instr);
   });
+}
+
+/* ==========================================================
+   SUPPLEMENT PROTOCOLS
+   ========================================================== */
+const TIMINGS = ['Morning', 'With breakfast', 'Pre-workout', 'Post-workout', 'With dinner', 'Before bed', 'Any time'];
+const timingIdx = t => { const i = TIMINGS.indexOf(t); return i < 0 ? 99 : i; };
+const normName = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const sameSupp = (a, b) => { const x = normName(a), y = normName(b); if (!x || !y) return false; return x === y || (Math.min(x.length, y.length) >= 5 && (x.includes(y) || y.includes(x))); };
+const money = n => '$' + (Math.round((Number(n) || 0) * 100) / 100).toFixed(0);
+const safeLink = u => /^https:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
+
+const DISCLAIMER = `This supplement protocol is general information for educational purposes only. It is not medical advice, and Zane is not a doctor, pharmacist, or registered dietitian. These statements have not been evaluated by the Food and Drug Administration, and these products are not intended to diagnose, treat, cure, or prevent any disease. Talk to your doctor before starting any supplement, especially if you take medication, have a medical condition, or are pregnant or breastfeeding. Follow the directions on each product label. Stop using a product and get medical help if you have a bad reaction. Cost estimates are approximate, and product links may be affiliate links.`;
+
+function suppQuestions() {
+  const qs = [
+    { k: 'budget', q: "What's your monthly budget for supplements?", type: 'choice', opts: ['$0–25 / month', '$25–50 / month', '$50–100 / month', '$100+ / month'] },
+    { k: 'goals', q: 'What do you want supplements to help with?', sub: 'Pick up to 3.', type: 'multi', max: 3, opts: ['Building muscle', 'Recovery', 'Sleep', 'Energy & focus', 'Hitting my protein', 'General health', 'Joint health'] },
+    { k: 'current', q: 'What supplements do you take right now?', type: 'textarea', ph: 'e.g. creatine, multivitamin. Write "none" if none.' },
+    { k: 'medications', q: 'Do you take any medications?', sub: 'Include prescriptions and regular over-the-counter meds.', type: 'textarea', ph: 'List them, or write "none".' },
+    { k: 'conditions', q: 'Any medical conditions?', sub: 'e.g. heart, blood pressure, kidney, liver, diabetes, anxiety.', type: 'textarea', ph: 'List them, or write "none".' },
+    { k: 'allergies_diet', q: 'Allergies or diet restrictions?', type: 'textarea', ph: 'e.g. vegan, lactose intolerant, fish allergy. Write "none" if none.' },
+    { k: 'caffeine', q: 'How do you handle caffeine?', type: 'choice', opts: ['I handle caffeine fine', "I'm sensitive to caffeine", 'I avoid caffeine'] },
+    { k: 'pregnant', q: 'Are you pregnant or breastfeeding?', type: 'choice', opts: ['No', 'Yes', 'Not applicable'] },
+  ];
+  if (!S.intake?.answers?.age) qs.splice(2, 0, { k: 'age', q: 'How old are you?', type: 'number', ph: '25' });
+  return qs;
+}
+
+/* ----- Client: card on the Today tab ----- */
+let protoOpen = false;
+function protocolCard() {
+  const p = S.protocol;
+  if (p) {
+    const d = p.data || {};
+    return `<div class="proto ${protoOpen ? 'open' : ''}">
+      <button class="proto-head" id="protoToggle"><span><b>Your Supplement Protocol</b><small>${(d.items || []).length} items · about ${money(d.total_est_monthly_cost)}/mo</small></span><span class="chev">${ICON.right}</span></button>
+      ${protoOpen ? `<div class="proto-body">
+        ${d.summary ? `<p class="muted" style="line-height:1.55;margin-bottom:12px">${esc(d.summary)}</p>` : ''}
+        ${(d.items || []).slice().sort((a, b) => timingIdx(a.timing) - timingIdx(b.timing)).map(it => `
+          <div class="ex">
+            <div class="ex-top"><b>${esc(it.name)}</b><span class="muted" style="font-size:13px;white-space:nowrap">${money(it.est_monthly_cost)}/mo</span></div>
+            <div class="ex-meta"><span>${esc(it.dose)}</span><span>${esc(it.timing)}</span></div>
+            ${it.purpose ? `<div class="ex-note">${esc(it.purpose)}</div>` : ''}
+            ${safeLink(it.link) ? `<a class="shop" href="${esc(safeLink(it.link))}" target="_blank" rel="noopener">Shop ↗</a>` : ''}
+          </div>`).join('')}
+        <p class="fine">${esc(DISCLAIMER)}</p>
+      </div>` : ''}
+    </div>`;
+  }
+  if (S.suppIntake) return `<div class="proto"><div class="proto-head" style="cursor:default"><span><b>Your supplement protocol is being built</b><small>Zane is reviewing your answers. It'll show up here.</small></span></div></div>`;
+  return `<div class="proto cta"><div class="proto-head" style="cursor:default"><span><b>Get your supplement protocol</b><small>8 quick questions. Zane builds a stack that fits your goals and budget.</small></span></div>
+    <button class="btn btn-primary" id="suppStart" style="margin:0 16px 16px;width:calc(100% - 32px)">Start</button></div>`;
+}
+function viewDisclaimer() {
+  return `<div class="hero-card">
+    <div class="k" style="color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">Your supplement protocol is ready</div>
+    <div class="display" style="font-size:30px;margin:10px 0 14px">Before you <span class="accent">start.</span></div>
+    <p class="disclaimer-text">${esc(DISCLAIMER)}</p>
+    <label class="check-line"><input type="checkbox" id="ackBox" /> <span>I've read this and understand it's not medical advice. I'll check with my doctor if I have any concerns.</span></label>
+    <button class="btn btn-primary" id="ackBtn" disabled style="margin-top:16px">I Understand</button>
+  </div>`;
+}
+function bindProtocolClient() {
+  const t = document.getElementById('protoToggle'); if (t) t.onclick = () => { protoOpen = !protoOpen; renderShell(); };
+  const st = document.getElementById('suppStart');
+  if (st) st.onclick = () => startQuestions('supps', suppQuestions(), submitSuppIntake);
+  const box = document.getElementById('ackBox'), btn = document.getElementById('ackBtn');
+  if (box && btn) {
+    box.onchange = () => { btn.disabled = !box.checked; };
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try { await api.ackProtocol(S.protocol.id); S.protocol.acknowledged_at = new Date().toISOString(); S.sups = await api.supplements(); protoOpen = true; computeStreak(); renderShell(); toast('Your stack is in your daily checklist'); }
+      catch (e) { btn.disabled = false; btn.textContent = 'I Understand'; toast("Couldn't save. Try again."); }
+    };
+  }
+}
+async function submitSuppIntake() {
+  const btn = document.getElementById('qNext'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const answers = { ...Q.a };
+    await api.submitSuppIntake(answers);
+    S.suppIntake = { answers }; Q.on = false;
+    api.requestProtocol();
+    renderShell(); window.scrollTo(0, 0); toast('Submitted. Zane is on it.');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
+    renderErr("Couldn't submit. Check your connection and try again.");
+  }
+}
+
+/* ----- Coach: supplements section on a client's page ----- */
+function suppStatus(c) {
+  const ps = C.protocols[c.id] || [];
+  if (ps[0]?.status === 'generating') return ['Supps: drafting…', 'warn'];
+  if (ps[0]?.status === 'failed') return ['Supps: failed', 'bad'];
+  if (ps.some(p => p.status === 'draft')) return ['Review supps', 'hot'];
+  if (ps.some(p => p.status === 'published')) return null;
+  if (C.suppIntakes[c.id]) return ['Supps: needs draft', 'hot'];
+  return null;
+}
+const blankItem = () => ({ name: '', dose: '', timing: 'Morning', purpose: '', est_monthly_cost: 0, link: '' });
+function viewCoachSupps(c) {
+  const ps = C.protocols[c.id] || [];
+  const draft = ps.find(p => ['draft', 'generating', 'failed'].includes(p.status));
+  const pub = ps.find(p => p.status === 'published');
+  const intake = C.suppIntakes[c.id];
+  const label = k => (suppQuestions().concat([{ k: 'age', q: 'Age' }]).find(q => q.k === k) || { q: k }).q;
+  let part = '';
+  if (draft?.status === 'generating') part = `<div class="card center" style="min-height:140px"><div><div class="spin" style="margin:0 auto 14px"></div><b>Generating protocol…</b><div class="muted" style="font-size:13px;margin-top:6px">Usually under a minute.</div></div></div>`;
+  else if (draft?.status === 'failed' && !(C.sedit?.items || []).length) part = `<div class="notice bad">Generating failed: ${esc(draft.error || 'unknown error')}</div><button class="btn btn-primary" id="sGen">Try Generating Again</button>`;
+  else if (draft && C.sedit) {
+    const total = (C.sedit.items || []).reduce((s, it) => s + (Number(it.est_monthly_cost) || 0), 0);
+    part = `
+      ${draft.ai_notes ? `<div class="notice"><b>Notes for you</b> (the client never sees these)<br>${esc(draft.ai_notes)}</div>` : ''}
+      <div class="card ed">
+        <label>Summary (client sees this)</label><textarea class="field" data-spath="summary" rows="3">${esc(C.sedit.summary || '')}</textarea>
+        <div class="muted" style="font-size:13px;margin-top:10px">Estimated total: <b style="color:var(--text)">${money(total)}/mo</b>${intake?.answers?.budget ? ` · Budget: ${esc(intake.answers.budget)}` : ''}</div>
+      </div>
+      ${(C.sedit.items || []).map((it, i) => `
+        <div class="card ed">
+          <div class="ed-exhead"><input class="field strong" data-spath="items.${i}.name" value="${esc(it.name)}" placeholder="Supplement" />
+            <div class="ed-btns"><button data-sdel="${i}" class="x" aria-label="Remove">✕</button></div></div>
+          <div class="ed-2">
+            <div><label>Dose</label><input class="field" data-spath="items.${i}.dose" value="${esc(it.dose)}" placeholder="5 g daily" /></div>
+            <div><label>Timing</label><select class="field" data-spath="items.${i}.timing">${TIMINGS.map(t => `<option ${t === it.timing ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+          </div>
+          <label>Why it's in their stack</label><input class="field" data-spath="items.${i}.purpose" value="${esc(it.purpose)}" />
+          <div class="ed-2">
+            <div><label>Est. $/month</label><input class="field" data-spath="items.${i}.est_monthly_cost" inputmode="decimal" value="${esc(it.est_monthly_cost)}" /></div>
+            <div><label>Product link</label><input class="field" data-spath="items.${i}.link" value="${esc(it.link)}" placeholder="https://…" /></div>
+          </div>
+        </div>`).join('')}
+      <button class="btn btn-ghost" id="sAdd" style="margin-bottom:12px">+ Add supplement</button>
+      <div class="sticky-actions"><button class="btn btn-ghost" id="sSave">Save Draft</button><button class="btn btn-primary" id="sPublish">Publish Protocol</button></div>
+      <div class="card"><div class="k">Rework this protocol</div>
+        <textarea class="field" id="sInstr" rows="3" style="margin-top:10px" placeholder='e.g. "Drop the pre-workout, add electrolytes, keep it under $50"'></textarea>
+        <button class="btn btn-ghost" id="sRegen" style="margin-top:10px">Regenerate Protocol</button></div>`;
+  } else {
+    part = `${pub ? `<div class="card"><div class="k">Published protocol</div><div class="v txt">${(pub.data?.items || []).map(i => esc(i.name)).join(', ')}</div>
+        <div class="muted" style="font-size:13px;margin-top:6px">${pub.acknowledged_at ? 'Client accepted the disclaimer ' + new Date(pub.acknowledged_at).toLocaleDateString() : 'Waiting for client to accept the disclaimer'}</div>
+        <button class="btn btn-ghost" id="sEditPub" style="margin-top:12px">Edit as New Version</button></div>` : ''}
+      ${intake ? `<button class="btn btn-primary" id="sGen">${pub ? 'Generate New Protocol' : 'Generate Protocol'}</button>`
+        : `<div class="empty"><b>Waiting on their supplement questions</b>They'll see a "Get your supplement protocol" card on their Today tab.</div>`}`;
+  }
+  return `
+    ${intake ? `<details class="card" style="margin-top:6px"><summary><span class="k">Supplement answers</span></summary>
+      <div class="answers">${Object.entries(intake.answers || {}).map(([k, v]) => `<div><span>${esc(label(k))}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}</div></details>` : ''}
+    <div class="sec" style="margin-top:22px"><h2>Supplements</h2>${draft && draft.status !== 'generating' ? `<span class="pill hot">Draft, not visible to client</span>` : ''}</div>
+    ${part}`;
+}
+async function generateProtocol(instructions) {
+  const c = C.sel; (C.protocols[c] ||= []);
+  const d = C.protocols[c].find(p => ['draft', 'failed'].includes(p.status));
+  if (d) d.status = 'generating'; else C.protocols[c].unshift({ user_id: c, status: 'generating' });
+  renderShell(); startPoll();
+  try {
+    await api.generateProtocol(c, instructions);
+    await loadCoach();
+    const nd = (C.protocols[c] || []).find(p => p.status === 'draft');
+    C.sedit = nd?.data ? structuredClone(nd.data) : null;
+    stopPoll(); renderShell(); toast('Protocol ready to review');
+  } catch (e) { stopPoll(); await loadCoach().catch(() => {}); renderShell(); toast(e.message || 'Generating failed'); }
+}
+function bindCoachSupps() {
+  const $ = id => document.getElementById(id);
+  $('sGen') && ($('sGen').onclick = () => generateProtocol(''));
+  $('sEditPub') && ($('sEditPub').onclick = async () => {
+    const pub = (C.protocols[C.sel] || []).find(p => p.status === 'published');
+    try { await api.coachCreateProtocolDraft(C.sel, pub.data); await loadCoach(); C.sedit = structuredClone(pub.data); renderShell(); }
+    catch (e) { toast("Couldn't create a new version"); }
+  });
+  if (!C.sedit) return;
+  const setS = (path, val) => { const ks = path.split('.'); let o = C.sedit; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; const k = ks[ks.length - 1]; o[k] = k === 'est_monthly_cost' ? (Number(val) || 0) : val; };
+  document.querySelectorAll('[data-spath]').forEach(el => { el.oninput = el.onchange = () => setS(el.dataset.spath, el.value); });
+  document.querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => { C.sedit.items.splice(+b.dataset.sdel, 1); renderShell(); });
+  $('sAdd') && ($('sAdd').onclick = () => { (C.sedit.items ||= []).push(blankItem()); renderShell(); });
+  const draftRow = () => (C.protocols[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
+  const clean = () => {
+    const d = structuredClone(C.sedit), seen = [];
+    d.items = (d.items || []).filter(it => String(it.name).trim()).filter(it => { if (seen.some(n => sameSupp(n, it.name))) return false; seen.push(it.name); return true; })
+      .map(it => ({ ...it, link: safeLink(it.link) }));
+    d.total_est_monthly_cost = d.items.reduce((s, it) => s + (Number(it.est_monthly_cost) || 0), 0);
+    return d;
+  };
+  $('sSave') && ($('sSave').onclick = async () => { try { await api.coachSaveProtocol(draftRow().id, clean()); toast('Draft saved'); } catch (e) { toast("Couldn't save. Try again."); } });
+  $('sPublish') && ($('sPublish').onclick = async () => {
+    const data = clean();
+    if (!data.items.length) return toast('Add at least one supplement');
+    if (!confirm(`Publish this protocol? It gets added to the client's daily checklist (no duplicates), and they'll see the disclaimer first.`)) return;
+    try { const r = await api.coachPublishProtocol(draftRow().id, C.sel, data); await loadCoach(); C.sedit = null; renderShell(); toast(`Published: ${r.added} added, ${r.updated} updated`); }
+    catch (e) { console.error(e); toast("Couldn't publish. Try again."); }
+  });
+  $('sRegen') && ($('sRegen').onclick = async () => {
+    const instr = $('sInstr').value.trim(); if (!instr) return toast('Type what you want changed');
+    try { await api.coachSaveProtocol(draftRow().id, clean()); } catch (e) {}
+    generateProtocol(instr);
+  });
+}
+
+// Merge a published protocol into a client's supplement list without duplicates.
+function mergePlan(existing, items) {
+  const updates = [], inserts = [];
+  for (const it of items) {
+    const match = existing.find(e => sameSupp(e.name, it.name));
+    const fields = { dose: it.dose || null, timing: it.timing || null, note: it.purpose || null, link: safeLink(it.link) || null, source: 'protocol' };
+    if (match) updates.push({ id: match.id, ...fields });
+    else inserts.push({ name: it.name, ...fields });
+  }
+  return { updates, inserts };
 }
 
 /* ---------- Me ---------- */
@@ -922,13 +1228,14 @@ function viewMe() {
     <button class="btn btn-ghost" id="out" style="margin-top:14px">Sign Out</button>`;
 }
 function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; }
-async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = null; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
+async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = null; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
 
 /* ---------- Streak ---------- */
 function computeStreak() {
-  const ids = S.sups.map(s => s.id);
-  if (!ids.length) { S.streak = 0; return; }
-  const full = d => ids.every(id => S.logs.has(key(id, d)));
+  if (!S.sups.length) { S.streak = 0; return; }
+  // A supplement only counts toward days on/after the day it was added, so new items don't break an old streak.
+  const added = s => s.created_at ? iso(new Date(s.created_at)) : '0000-00-00';
+  const full = d => { const due = S.sups.filter(s => added(s) <= d); return due.length > 0 && due.every(s => S.logs.has(key(s.id, d))); };
   let d = TODAY(); if (!full(d)) d = addDays(d, -1);   // today not finished yet doesn't break it
   let n = 0; while (full(d) && n < 365) { n++; d = addDays(d, -1); }
   S.streak = n;
@@ -953,6 +1260,7 @@ async function loadData() {
     api.intake(S.user.id).catch(() => null), api.program(S.user.id).catch(() => null)
   ]);
   S.intake = intake; S.program = program;
+  [S.suppIntake, S.protocol] = await Promise.all([api.suppIntake(S.user.id).catch(() => null), api.protocol(S.user.id).catch(() => null)]);
   S.sups = sups || [];
   S.logs = new Set((logs || []).map(l => key(l.supplement_id, l.log_date)));
   computeStreak();
