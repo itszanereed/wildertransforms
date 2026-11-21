@@ -12,6 +12,7 @@ import { COACHING_RULES } from './_coaching-rules.js';
 
 const env = (k) => (process.env[k] || '').trim();
 const MODEL = () => env('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
+const SB_URL = () => (env('SUPABASE_URL') || 'https://mfvyflsbxrlntefyijsa.supabase.co').replace(/\/+$/, '');
 
 // ---------- Supabase (admin) ----------
 function sbHeaders(extra = {}) {
@@ -21,24 +22,39 @@ function sbHeaders(extra = {}) {
   return h;
 }
 async function sb(path, opts = {}) {
-  const res = await fetch(`${env('SUPABASE_URL')}${path}`, { ...opts, headers: sbHeaders(opts.headers) });
+  const res = await fetch(`${SB_URL()}${path}`, { ...opts, headers: sbHeaders(opts.headers) });
   const text = await res.text();
   let data = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
   return data;
 }
 
-// Who is calling? (checks their login token with Supabase)
+// Who is calling? Returns { profile } or { err } with a plain-English reason.
 async function caller(request) {
-  const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-  const res = await fetch(`${env('SUPABASE_URL')}/auth/v1/user`, {
-    headers: { apikey: env('SUPABASE_SECRET_KEY'), Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return null;
+  const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return { err: 'No login token was sent. Sign out of the app and back in.' };
+  const key = env('SUPABASE_SECRET_KEY');
+  if (key.startsWith('sb_publishable_')) return { err: 'SUPABASE_SECRET_KEY in Vercel is the publishable key. Use the sb_secret_ key.' };
+
+  let res;
+  try {
+    res = await fetch(`${SB_URL()}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
+  } catch (e) {
+    return { err: 'Could not reach Supabase. Check SUPABASE_URL in Vercel.' };
+  }
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 160);
+    if (/api key|apikey|Invalid API/i.test(detail)) return { err: `Supabase rejected the server key. Re-copy SUPABASE_SECRET_KEY into Vercel and redeploy. (${res.status})` };
+    return { err: `Your login expired or wasn't accepted (${res.status}). Sign out of the app and back in. ${detail}` };
+  }
   const user = await res.json();
-  const [profile] = await sb(`/rest/v1/profiles?select=id,full_name,email,tier,active,is_coach&id=eq.${user.id}`);
-  return profile || null;
+  try {
+    const [profile] = await sb(`/rest/v1/profiles?select=id,full_name,email,tier,active,is_coach&id=eq.${user.id}`);
+    if (!profile) return { err: 'No profile found for your account.' };
+    return { profile };
+  } catch (e) {
+    return { err: `Profile lookup failed: ${String(e.message).slice(0, 160)}` };
+  }
 }
 
 // ---------- Telegram ----------
@@ -137,8 +153,9 @@ const json = (obj, status = 200) => Response.json(obj, { status });
 export async function POST(request) {
   if (!env('ANTHROPIC_API_KEY') || !env('SUPABASE_SECRET_KEY')) return json({ error: 'Server not configured' }, 500);
 
-  const me = await caller(request).catch(() => null);
-  if (!me) return json({ error: 'Not logged in' }, 401);
+  const who = await caller(request).catch((e) => ({ err: String(e.message || e) }));
+  if (!who.profile) return json({ error: who.err || 'Not logged in' }, 401);
+  const me = who.profile;
 
   let body = {};
   try { body = await request.json(); } catch { /* client calls may send no body */ }
