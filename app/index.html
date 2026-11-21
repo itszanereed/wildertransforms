@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Wilder Transforms</title>
+<meta name="theme-color" content="#0a0a09" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Wilder" />
+<link rel="apple-touch-icon" href="/app/apple-touch-icon.png" />
+<link rel="manifest" href="/app/manifest.webmanifest" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0a0a09; --bg-2:#121210; --card:#161614; --card-2:#1c1b18; --line:#26251f;
+    --text:#f3efe6; --muted:#9d988b; --accent:#ff6a1a; --accent-2:#ffb547; --good:#3ddc84;
+    --display:'Anton', Impact, sans-serif; --body:'Inter', system-ui, -apple-system, sans-serif;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased;min-height:100%}
+  body{overscroll-behavior-y:none}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  input{font:inherit;color:var(--text)}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;min-height:100dvh;padding:calc(var(--safe-t) + 18px) 20px calc(var(--safe-b) + 96px)}
+  .display{font-family:var(--display);text-transform:uppercase;letter-spacing:.01em;line-height:1}
+  .accent{background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .muted{color:var(--muted)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border-radius:14px;font-weight:700;font-size:16px;transition:transform .1s, opacity .2s}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--accent);color:#120800}
+  .btn-ghost{background:var(--card);border:1px solid var(--line)}
+  .btn[disabled]{opacity:.5;pointer-events:none}
+  .field{width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;font-size:16px;outline:none}
+  .field:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,106,26,.18)}
+  .err{color:#ff8a5c;font-size:14px;min-height:20px;margin-top:10px;text-align:center}
+  .demo{background:rgba(255,181,71,.1);border:1px solid rgba(255,181,71,.35);color:var(--accent-2);font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px;margin-bottom:16px;text-align:center}
+
+  /* ---- Login ---- */
+  .login{min-height:calc(100dvh - 140px);display:flex;flex-direction:column;justify-content:center;gap:14px}
+  .logo{width:64px;height:64px;border-radius:16px;background:var(--accent);color:#120800;display:grid;place-items:center;font-family:var(--display);font-size:36px;margin-bottom:10px}
+  .login h1{font-size:46px}
+  .login p{color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .code{letter-spacing:.5em;text-align:center;font-size:24px;font-weight:700}
+
+  /* ---- Header ---- */
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .hello{font-size:14px;color:var(--muted)}
+  .hello b{display:block;color:var(--text);font-size:20px;margin-top:2px}
+  .tier{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(255,106,26,.45);background:rgba(255,106,26,.08);padding:6px 10px;border-radius:999px;white-space:nowrap}
+
+  /* ---- Day switcher ---- */
+  .day{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px;margin-bottom:14px}
+  .day button{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--card-2)}
+  .day button[disabled]{opacity:.25}
+  .day .label{text-align:center}
+  .day .label b{font-family:var(--display);font-size:24px;text-transform:uppercase;display:block;line-height:1.1}
+  .day .label small{color:var(--muted);font-size:12px}
+
+  /* ---- Progress card ---- */
+  .progress{display:flex;align-items:center;gap:18px;background:radial-gradient(ellipse 80% 120% at 100% 0%,rgba(255,106,26,.16),transparent 70%),var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:22px}
+  .ring{position:relative;width:96px;height:96px;flex:0 0 auto}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .num{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+  .ring .num b{font-family:var(--display);font-size:28px;line-height:1}
+  .ring .num small{display:block;font-size:11px;color:var(--muted)}
+  .streak b{font-family:var(--display);font-size:40px;line-height:1}
+  .streak small{color:var(--muted);font-size:13px}
+  .streak .msg{font-size:14px;margin-top:6px;font-weight:600}
+
+  /* ---- Section title ---- */
+  .sec{display:flex;justify-content:space-between;align-items:center;margin:0 2px 10px}
+  .sec h2{font-family:var(--display);font-size:22px;text-transform:uppercase;font-weight:400}
+  .link{color:var(--accent);font-weight:700;font-size:14px}
+
+  /* ---- Supplement rows ---- */
+  .list{display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;transition:border-color .2s, background .2s}
+  .row .box{width:30px;height:30px;border-radius:9px;border:2px solid #3a382f;display:grid;place-items:center;flex:0 0 auto;transition:all .2s}
+  .row .box svg{opacity:0;transform:scale(.6);transition:all .2s}
+  .row.on{border-color:rgba(255,106,26,.5);background:linear-gradient(90deg,rgba(255,106,26,.10),transparent 70%),var(--card)}
+  .row.on .box{background:var(--accent);border-color:var(--accent)}
+  .row.on .box svg{opacity:1;transform:none}
+  .row .name{font-weight:700;font-size:16px}
+  .row .dose{color:var(--muted);font-size:13px;margin-top:2px}
+  .empty{text-align:center;padding:30px 18px;border:1px dashed #3a382f;border-radius:16px;color:var(--muted)}
+  .empty b{display:block;color:var(--text);margin-bottom:6px}
+
+  /* ---- Sheet (edit list) ---- */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+  .sheet-bg.open{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;background:var(--bg-2);border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:14px 20px calc(var(--safe-b) + 24px);transform:translateY(100%);transition:transform .25s ease;max-height:86dvh;overflow:auto}
+  .sheet.open{transform:none}
+  .grab{width:40px;height:5px;border-radius:3px;background:#3a382f;margin:0 auto 16px}
+  .sheet h3{font-family:var(--display);font-size:28px;text-transform:uppercase;font-weight:400;margin-bottom:14px}
+  .edit-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .edit-row .name{font-weight:700}
+  .edit-row .dose{color:var(--muted);font-size:13px}
+  .del{color:#ff8a5c;font-weight:700;font-size:14px;padding:8px}
+  .add{display:grid;grid-template-columns:1.3fr 1fr;gap:10px;margin:18px 0 12px}
+
+  /* ---- Placeholder screens ---- */
+  .soon{text-align:center;padding:60px 10px}
+  .soon .display{font-size:40px;margin:14px 0 10px}
+  .soon p{color:var(--muted);line-height:1.6}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:12px}
+  .card .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+  .card .v{font-size:17px;font-weight:600;margin-top:4px;word-break:break-all}
+
+  /* ---- Tab bar ---- */
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(10,10,9,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:8px 10px calc(var(--safe-b) + 8px)}
+  .tabs .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;color:var(--muted);font-size:11px;font-weight:600}
+  .tab svg{width:24px;height:24px}
+  .tab.on{color:var(--accent)}
+
+  /* ---- Install hint ---- */
+  .install{position:fixed;left:12px;right:12px;bottom:calc(var(--safe-b) + 84px);z-index:35;max-width:496px;margin:0 auto;background:var(--card-2);border:1px solid rgba(255,106,26,.45);border-radius:16px;padding:14px 44px 14px 16px;font-size:14px;line-height:1.45;box-shadow:0 20px 50px -10px rgba(0,0,0,.8)}
+  .install b{color:var(--accent)}
+  .install .x{position:absolute;top:8px;right:8px;width:30px;height:30px;color:var(--muted);font-size:20px}
+
+  .center{min-height:70dvh;display:grid;place-items:center;text-align:center}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 14px);transform:translate(-50%,-140%);z-index:60;background:var(--card-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s}
+  .toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="app" id="app"><div class="center"><div class="spin"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="/app/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ==========================================================
+   DATA LAYER — talks to Supabase, or fakes it in demo mode
+   ========================================================== */
+const cfg = window.WT_CONFIG || {};
+const DEMO = !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes('YOUR_') || !window.supabase;
+
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); };
+const TODAY = () => iso(new Date());
+
+function makeSupabaseApi() {
+  const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+  const must = ({ data, error }) => { if (error) throw error; return data; };
+  return {
+    async user() { const { data } = await sb.auth.getSession(); return data.session ? data.session.user : null; },
+    // shouldCreateUser:false → only people you've added can log in
+    async sendCode(email) { must(await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })); },
+    async verifyCode(email, token) { must(await sb.auth.verifyOtp({ email, token, type: 'email' })); },
+    async signOut() { await sb.auth.signOut(); },
+    async profile(uid) { return must(await sb.from('profiles').select('*').eq('id', uid).maybeSingle()); },
+    async supplements() { return must(await sb.from('supplements').select('id,name,dose').eq('archived', false).order('created_at')); },
+    async addSupplement(name, dose) { return must(await sb.from('supplements').insert({ name, dose: dose || null }).select('id,name,dose').single()); },
+    async archiveSupplement(id) { must(await sb.from('supplements').update({ archived: true }).eq('id', id)); },
+    async logs(from, to) { return must(await sb.from('supplement_logs').select('supplement_id,log_date').gte('log_date', from).lte('log_date', to)); },
+    async setTaken(supplement_id, log_date, taken) {
+      if (taken) must(await sb.from('supplement_logs').upsert({ supplement_id, log_date }, { onConflict: 'user_id,supplement_id,log_date', ignoreDuplicates: true }));
+      else must(await sb.from('supplement_logs').delete().eq('supplement_id', supplement_id).eq('log_date', log_date));
+    }
+  };
+}
+
+function makeDemoApi() {
+  let signedIn = false, n = 10;
+  const sups = [
+    { id: 's1', name: 'Creatine', dose: '5 g' },
+    { id: 's2', name: 'Vitamin D3', dose: '5,000 IU' },
+    { id: 's3', name: 'Fish Oil', dose: '2 capsules' },
+    { id: 's4', name: 'Magnesium', dose: '400 mg, before bed' }
+  ];
+  const logs = [];
+  for (let i = 1; i <= 6; i++) sups.forEach(s => logs.push({ supplement_id: s.id, log_date: addDays(TODAY(), -i) }));
+  logs.push({ supplement_id: 's1', log_date: TODAY() });
+  const wait = (v) => new Promise(r => setTimeout(() => r(v), 150));
+  return {
+    async user() { return signedIn ? { id: 'demo', email: 'client@example.com' } : null; },
+    async sendCode() { return wait(); },
+    async verifyCode() { signedIn = true; return wait(); },
+    async signOut() { signedIn = false; },
+    async profile() { return { full_name: 'Demo Client', tier: 'transformation', active: true, email: 'client@example.com' }; },
+    async supplements() { return wait(sups.slice()); },
+    async addSupplement(name, dose) { const s = { id: 's' + (++n), name, dose }; sups.push(s); return wait(s); },
+    async archiveSupplement(id) { const i = sups.findIndex(s => s.id === id); if (i > -1) sups.splice(i, 1); },
+    async logs(from, to) { return wait(logs.filter(l => l.log_date >= from && l.log_date <= to)); },
+    async setTaken(id, date, taken) {
+      const i = logs.findIndex(l => l.supplement_id === id && l.log_date === date);
+      if (taken && i < 0) logs.push({ supplement_id: id, log_date: date });
+      if (!taken && i > -1) logs.splice(i, 1);
+    }
+  };
+}
+
+const api = DEMO ? makeDemoApi() : makeSupabaseApi();
+
+/* ==========================================================
+   STATE + RENDERING
+   ========================================================== */
+const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email' };
+const $app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const key = (id, d) => id + '|' + d;
+
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+const demoBar = () => DEMO ? `<div class="demo">Demo mode: sample data only. Add your Supabase keys in config.js to go live.</div>` : '';
+
+const ICON = {
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#120800" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  left: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  right: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>',
+  today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  program: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>',
+  me: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+};
+
+/* ---------- Login ---------- */
+function renderLogin(errMsg = '') {
+  const codeStep = S.loginStep === 'code';
+  $app.innerHTML = `
+    ${demoBar()}
+    <div class="login">
+      <div class="logo">W</div>
+      <h1 class="display">Lock <span class="accent">In.</span></h1>
+      ${codeStep
+        ? `<p>We sent a 6-digit code to <b style="color:var(--text)">${esc(S.loginEmail)}</b>. Enter it below.</p>
+           <input class="field code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" />
+           <button class="btn btn-primary" id="go">Log In</button>
+           <button class="btn btn-ghost" id="back">Use a different email</button>`
+        : `<p>Client login. Enter the email you signed up with and we'll send you a login code.</p>
+           <input class="field" id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" value="${esc(S.loginEmail)}" />
+           <button class="btn btn-primary" id="go">Send My Code</button>
+           <p style="font-size:13px;text-align:center;margin:6px 0 0">Not a client yet? <a href="/#apply" style="color:var(--accent);font-weight:700">Apply here</a></p>`}
+      <div class="err" id="err">${esc(errMsg)}</div>
+    </div>`;
+  const go = document.getElementById('go');
+  if (codeStep) {
+    const input = document.getElementById('code'); input.focus();
+    document.getElementById('back').onclick = () => { S.loginStep = 'email'; renderLogin(); };
+    const submit = async () => {
+      const code = input.value.trim();
+      if (!/^\d{6}$/.test(code)) return renderErr('Enter the 6-digit code from your email.');
+      go.disabled = true; go.textContent = 'Checking…';
+      try { await api.verifyCode(S.loginEmail, code); await boot(); }
+      catch (e) { go.disabled = false; go.textContent = 'Log In'; renderErr('That code didn\'t work. Check it or request a new one.'); }
+    };
+    go.onclick = submit; input.oninput = () => { if (input.value.length === 6) submit(); };
+  } else {
+    const input = document.getElementById('email');
+    const submit = async () => {
+      const email = input.value.trim().toLowerCase();
+      if (!/^\S+@\S+\.\S+$/.test(email)) return renderErr('Enter a valid email.');
+      go.disabled = true; go.textContent = 'Sending…';
+      try { await api.sendCode(email); S.loginEmail = email; S.loginStep = 'code'; renderLogin(); }
+      catch (e) {
+        go.disabled = false; go.textContent = 'Send My Code';
+        renderErr(/not allowed|signups|not found|Signups not allowed/i.test(e.message || '') ? 'That email isn\'t on the client list yet. Apply first or contact Zane.' : 'Couldn\'t send the code. Try again in a minute.');
+      }
+    };
+    go.onclick = submit; input.onkeydown = e => { if (e.key === 'Enter') submit(); };
+  }
+}
+function renderErr(m) { const el = document.getElementById('err'); if (el) el.textContent = m; }
+
+/* ---------- Not active ---------- */
+function renderInactive() {
+  $app.innerHTML = `${demoBar()}
+    <div class="soon">
+      <div class="logo" style="margin:0 auto">W</div>
+      <div class="display">Almost <span class="accent">There.</span></div>
+      <p>Your account is set up, but your coaching access isn't active yet. Once your membership is confirmed, everything unlocks here automatically.</p>
+      <p style="margin-top:12px">Questions? Message Zane directly.</p>
+      <button class="btn btn-ghost" style="margin-top:26px" id="out">Sign Out</button>
+    </div>`;
+  document.getElementById('out').onclick = signOut;
+}
+
+/* ---------- Main shell ---------- */
+function renderShell() {
+  let body = '';
+  if (S.tab === 'today') body = viewToday();
+  if (S.tab === 'program') body = viewProgram();
+  if (S.tab === 'me') body = viewMe();
+  const first = (S.profile.full_name || '').split(' ')[0] || 'Brother';
+  const tierLabel = S.profile.tier === 'transformation' ? 'Transformation' : S.profile.tier === 'fitness' ? 'Fitness' : 'Member';
+  $app.innerHTML = `
+    ${demoBar()}
+    <div class="top">
+      <div class="hello">${greeting()}<b>${esc(first)}</b></div>
+      <span class="tier">${tierLabel}</span>
+    </div>
+    ${body}
+    <nav class="tabs"><div class="in">
+      ${['today', 'program', 'me'].map(t => `<button class="tab ${S.tab === t ? 'on' : ''}" data-tab="${t}">${ICON[t]}${t === 'today' ? 'Today' : t === 'program' ? 'Program' : 'Me'}</button>`).join('')}
+    </div></nav>
+    ${sheetHtml()}`;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.tab = b.dataset.tab; renderShell(); window.scrollTo(0, 0); });
+  bindToday(); bindSheet(); bindMe();
+  maybeInstallHint();
+}
+function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning,' : h < 18 ? 'Good afternoon,' : 'Good evening,'; }
+
+/* ---------- Today ---------- */
+function dayLabel(d) {
+  if (d === TODAY()) return 'Today';
+  if (d === addDays(TODAY(), -1)) return 'Yesterday';
+  return new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long' });
+}
+function viewToday() {
+  const d = S.date, total = S.sups.length;
+  const done = S.sups.filter(s => S.logs.has(key(s.id, d))).length;
+  const pct = total ? done / total : 0, C = 2 * Math.PI * 42;
+  const allDone = total && done === total;
+  const msg = !total ? 'Add your supplements to start' : allDone ? 'All done. That\'s locking in.' : `${total - done} left to take`;
+  return `
+    <div class="day">
+      <button id="prev" aria-label="Previous day">${ICON.left}</button>
+      <div class="label"><b>${dayLabel(d)}</b><small>${new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</small></div>
+      <button id="next" aria-label="Next day" ${d >= TODAY() ? 'disabled' : ''}>${ICON.right}</button>
+    </div>
+    <div class="progress">
+      <div class="ring">
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <circle cx="48" cy="48" r="42" fill="none" stroke="#26251f" stroke-width="9"/>
+          <circle cx="48" cy="48" r="42" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" style="transition:stroke-dashoffset .4s"/>
+          <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ff6a1a"/><stop offset="1" stop-color="#ffb547"/></linearGradient></defs>
+        </svg>
+        <div class="num"><div><b>${done}/${total}</b><small>taken</small></div></div>
+      </div>
+      <div class="streak">
+        <b class="${S.streak ? 'accent' : ''}">${S.streak}</b> <small>day streak</small>
+        <div class="msg">${msg}</div>
+      </div>
+    </div>
+    <div class="sec"><h2>Supplements</h2><button class="link" id="edit">${total ? 'Edit' : '+ Add'}</button></div>
+    <div class="list">
+      ${total ? S.sups.map(s => {
+        const on = S.logs.has(key(s.id, d));
+        return `<button class="row ${on ? 'on' : ''}" data-sup="${s.id}">
+          <span class="box">${ICON.check}</span>
+          <span><div class="name">${esc(s.name)}</div>${s.dose ? `<div class="dose">${esc(s.dose)}</div>` : ''}</span>
+        </button>`;
+      }).join('') : `<div class="empty"><b>No supplements yet</b>Tap "+ Add" and enter the stack your coach gave you.</div>`}
+    </div>`;
+}
+function bindToday() {
+  if (S.tab !== 'today') return;
+  document.getElementById('prev').onclick = () => { S.date = addDays(S.date, -1); renderShell(); };
+  document.getElementById('next').onclick = () => { if (S.date < TODAY()) { S.date = addDays(S.date, 1); renderShell(); } };
+  document.getElementById('edit').onclick = () => openSheet(true);
+  document.querySelectorAll('[data-sup]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.sup, k = key(id, S.date), taken = !S.logs.has(k);
+    taken ? S.logs.add(k) : S.logs.delete(k);           // update instantly
+    if (navigator.vibrate) navigator.vibrate(10);
+    computeStreak(); renderShell();
+    try { await api.setTaken(id, S.date, taken); }
+    catch (e) { taken ? S.logs.delete(k) : S.logs.add(k); computeStreak(); renderShell(); toast('Couldn\'t save. Check your connection.'); }
+  });
+}
+
+/* ---------- Edit supplements sheet ---------- */
+let sheetOpen = false;
+function sheetHtml() {
+  return `
+    <div class="sheet-bg ${sheetOpen ? 'open' : ''}" id="sheetBg"></div>
+    <div class="sheet ${sheetOpen ? 'open' : ''}" id="sheet">
+      <div class="grab"></div>
+      <h3>Your <span class="accent">Stack</span></h3>
+      ${S.sups.map(s => `<div class="edit-row"><div><div class="name">${esc(s.name)}</div>${s.dose ? `<div class="dose">${esc(s.dose)}</div>` : ''}</div><button class="del" data-del="${s.id}">Remove</button></div>`).join('') || '<p class="muted" style="margin-bottom:6px">Nothing added yet.</p>'}
+      <div class="add">
+        <input class="field" id="supName" maxlength="60" placeholder="Supplement (e.g. Creatine)" />
+        <input class="field" id="supDose" maxlength="40" placeholder="Dose (e.g. 5 g)" />
+      </div>
+      <button class="btn btn-primary" id="supAdd">Add Supplement</button>
+      <button class="btn btn-ghost" id="sheetDone" style="margin-top:10px">Done</button>
+    </div>`;
+}
+function openSheet(v) { sheetOpen = v; renderShell(); if (v) setTimeout(() => document.getElementById('supName')?.focus(), 250); }
+function bindSheet() {
+  const bg = document.getElementById('sheetBg'); if (!bg) return;
+  bg.onclick = () => openSheet(false);
+  document.getElementById('sheetDone').onclick = () => openSheet(false);
+  document.getElementById('supAdd').onclick = async () => {
+    const name = document.getElementById('supName').value.trim(), dose = document.getElementById('supDose').value.trim();
+    if (!name) return toast('Enter a supplement name');
+    try { const s = await api.addSupplement(name, dose); S.sups.push(s); computeStreak(); openSheet(true); toast(`${name} added`); }
+    catch (e) { toast('Couldn\'t add it. Try again.'); }
+  };
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.del;
+    try { await api.archiveSupplement(id); S.sups = S.sups.filter(s => s.id !== id); computeStreak(); openSheet(true); }
+    catch (e) { toast('Couldn\'t remove it. Try again.'); }
+  });
+}
+
+/* ---------- Program (Phase 3) ---------- */
+function viewProgram() {
+  return `<div class="soon">
+    <div style="color:var(--accent)">${ICON.program.replace('<svg', '<svg width="44" height="44"')}</div>
+    <div class="display">Program <span class="accent">Loading.</span></div>
+    <p>Your training split, workouts and weekly check-ins will live here. Coming soon.</p>
+  </div>`;
+}
+
+/* ---------- Me ---------- */
+function viewMe() {
+  const p = S.profile;
+  return `
+    <div class="card"><div class="k">Name</div><div class="v">${esc(p.full_name || '—')}</div></div>
+    <div class="card"><div class="k">Email</div><div class="v">${esc(p.email || S.user.email)}</div></div>
+    <div class="card"><div class="k">Plan</div><div class="v">${p.tier === 'transformation' ? 'Transformation Coaching' : p.tier === 'fitness' ? 'Fitness Coaching' : 'Member'}</div></div>
+    <button class="btn btn-ghost" id="out" style="margin-top:14px">Sign Out</button>`;
+}
+function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; }
+async function signOut() { await api.signOut(); S.user = null; S.loginStep = 'email'; sheetOpen = false; renderLogin(); }
+
+/* ---------- Streak ---------- */
+function computeStreak() {
+  const ids = S.sups.map(s => s.id);
+  if (!ids.length) { S.streak = 0; return; }
+  const full = d => ids.every(id => S.logs.has(key(id, d)));
+  let d = TODAY(); if (!full(d)) d = addDays(d, -1);   // today not finished yet doesn't break it
+  let n = 0; while (full(d) && n < 365) { n++; d = addDays(d, -1); }
+  S.streak = n;
+}
+
+/* ---------- iPhone "Add to Home Screen" hint ---------- */
+function maybeInstallHint() {
+  const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let dismissed = false; try { dismissed = localStorage.getItem('wt-install-hint') === '1'; } catch (e) {}
+  if (!ios || standalone || dismissed || document.getElementById('install')) return;
+  const el = document.createElement('div'); el.className = 'install'; el.id = 'install';
+  el.innerHTML = `<b>Get the app:</b> tap the Share button <span style="font-size:16px">⬆︎</span> at the bottom of Safari, then <b>Add to Home Screen</b>.<button class="x" aria-label="Dismiss">×</button>`;
+  el.querySelector('.x').onclick = () => { el.remove(); try { localStorage.setItem('wt-install-hint', '1'); } catch (e) {} };
+  document.body.appendChild(el);
+}
+
+/* ---------- Start ---------- */
+async function loadData() {
+  const [sups, logs] = await Promise.all([api.supplements(), api.logs(addDays(TODAY(), -120), TODAY())]);
+  S.sups = sups || [];
+  S.logs = new Set((logs || []).map(l => key(l.supplement_id, l.log_date)));
+  computeStreak();
+}
+async function boot() {
+  try {
+    S.user = await api.user();
+    if (!S.user) return renderLogin();
+    S.profile = (await api.profile(S.user.id)) || { active: false };
+    if (!S.profile.active) return renderInactive();
+    await loadData();
+    renderShell();
+  } catch (e) {
+    console.error(e);
+    $app.innerHTML = `<div class="soon"><div class="display">Connection <span class="accent">Issue.</span></div><p>Couldn't reach the server. Check your internet and try again.</p><button class="btn btn-primary" style="margin-top:22px" onclick="location.reload()">Retry</button></div>`;
+  }
+}
+// Refresh when the app comes back to the foreground on a new day
+let lastDay = TODAY();
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !S.user || !S.profile?.active || lastDay === TODAY()) return;
+  lastDay = TODAY(); S.date = TODAY();
+  try { await loadData(); } catch (e) {}
+  renderShell();
+});
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
+boot();
+</script>
+</body>
+</html>
