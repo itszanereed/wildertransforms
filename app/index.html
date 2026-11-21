@@ -261,7 +261,7 @@ function makeSupabaseApi() {
       if (!res.ok) throw new Error(out.error || 'Draft failed');
       return out;
     },
-    requestDraft() { this.callDraft({}, true).catch(() => {}); },
+    requestDraft() { this.callDraft({}, false).catch(() => {}); },
     // ---- Coach ----
     async coachClients() { return must(await sb.from('profiles').select('id,email,full_name,tier,active,is_coach').order('created_at', { ascending: false })); },
     async coachPrograms() { return must(await sb.from('programs').select('id,user_id,status,title,data,ai_notes,error,published_at,updated_at').neq('status', 'archived').order('created_at', { ascending: false })); },
@@ -284,7 +284,7 @@ function makeSupabaseApi() {
       if (!res.ok) throw new Error(out.error || 'Generating failed');
       return out;
     },
-    requestProtocol() { this.callProtocol({}, true).catch(() => {}); },
+    requestProtocol() { this.callProtocol({}, false).catch(() => {}); },
     async ackProtocol(id) { must(await sb.rpc('acknowledge_protocol', { protocol_id: id })); },
     async coachSuppIntakes() { return must(await sb.from('supp_intakes').select('user_id,answers,created_at').order('created_at', { ascending: false })); },
     async coachProtocols() { return must(await sb.from('protocols').select('id,user_id,status,data,ai_notes,error,acknowledged_at,published_at').neq('status', 'archived').order('created_at', { ascending: false })); },
@@ -996,7 +996,7 @@ function bindCoach() {
     if (!data.days.length) return toast('Add at least one training day');
     if (!confirm(`Publish "${data.title || 'this program'}" to the client? They'll see it right away.`)) return;
     try { await api.coachPublish(draftRow().id, C.sel, data); await loadCoach(); C.edit = null; renderShell(); toast('Published. The client can see it now.'); }
-    catch (e) { toast("Couldn't publish. Try again."); }
+    catch (e) { toast("Couldn't publish: " + (e.message || 'unknown error')); }
   });
   $('cRegen') && ($('cRegen').onclick = async () => {
     const instr = $('cInstr').value.trim();
@@ -1189,13 +1189,13 @@ function bindCoachSupps() {
     d.total_est_monthly_cost = d.items.reduce((s, it) => s + (Number(it.est_monthly_cost) || 0), 0);
     return d;
   };
-  $('sSave') && ($('sSave').onclick = async () => { try { await api.coachSaveProtocol(draftRow().id, clean()); toast('Draft saved'); } catch (e) { toast("Couldn't save. Try again."); } });
+  $('sSave') && ($('sSave').onclick = async () => { try { await api.coachSaveProtocol(draftRow().id, clean()); toast('Draft saved'); } catch (e) { toast("Couldn't save: " + (e.message || 'unknown error')); } });
   $('sPublish') && ($('sPublish').onclick = async () => {
     const data = clean();
     if (!data.items.length) return toast('Add at least one supplement');
     if (!confirm(`Publish this protocol? It gets added to the client's daily checklist (no duplicates), and they'll see the disclaimer first.`)) return;
     try { const r = await api.coachPublishProtocol(draftRow().id, C.sel, data); await loadCoach(); C.sedit = null; renderShell(); toast(`Published: ${r.added} added, ${r.updated} updated`); }
-    catch (e) { console.error(e); toast("Couldn't publish. Try again."); }
+    catch (e) { console.error(e); toast("Couldn't publish: " + (e.message || e.details || 'unknown error')); }
   });
   $('sRegen') && ($('sRegen').onclick = async () => {
     const instr = $('sInstr').value.trim(); if (!instr) return toast('Type what you want changed');
@@ -1261,6 +1261,12 @@ async function loadData() {
   ]);
   S.intake = intake; S.program = program;
   [S.suppIntake, S.protocol] = await Promise.all([api.suppIntake(S.user.id).catch(() => null), api.protocol(S.user.id).catch(() => null)]);
+  // Self-heal: if they submitted a questionnaire but nothing's published yet, nudge the server.
+  // (The server skips this if a draft already exists or is in progress, so it never double-drafts.)
+  if (!DEMO) {
+    if (S.intake && !S.program) api.requestDraft();
+    if (S.suppIntake && !S.protocol) api.requestProtocol();
+  }
   S.sups = sups || [];
   S.logs = new Set((logs || []).map(l => key(l.supplement_id, l.log_date)));
   computeStreak();
