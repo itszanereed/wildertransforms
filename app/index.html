@@ -205,6 +205,38 @@
   .check-line input{width:22px;height:22px;accent-color:var(--accent);flex:0 0 auto;margin-top:1px}
   .pills{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
   select.field{appearance:none;-webkit-appearance:none}
+
+  /* ---- Nutrition ---- */
+  .targets{display:flex;align-items:center;gap:18px;margin-top:16px;flex-wrap:wrap}
+  .kcal b{font-family:var(--display);font-size:44px;line-height:1;display:block;background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kcal small{color:var(--muted);font-size:12px}
+  .macros{display:flex;gap:14px}
+  .macros span{font-size:12px;color:var(--muted);display:flex;flex-direction:column}
+  .macros b{font-size:18px;color:var(--text)}
+  .shop-cta{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:linear-gradient(90deg,rgba(255,106,26,.14),transparent),var(--card);border:1px solid rgba(255,106,26,.45);border-radius:16px;padding:16px;margin-bottom:16px}
+  .shop-cta b{display:block;font-size:16px}
+  .shop-cta small{color:var(--muted);font-size:13px}
+  .daystrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:18px}
+  .dchip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+  .dchip b{font-size:13px}
+  .dchip small{font-size:11px;color:var(--muted);font-weight:700}
+  .dchip.today{border-color:#3a382f}
+  .dchip.on{background:var(--accent);border-color:var(--accent);color:#120800}
+  .dchip.on small{color:#120800}
+  .mb{margin:4px 0 10px}
+  .mb-top{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .mb-top b{color:var(--text)} .mb-top small{color:var(--muted);font-weight:500}
+  .mb-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .mb-bar div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .ing{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .ing li{font-size:14px;padding-left:16px;position:relative;line-height:1.45}
+  .ing li::before{content:"";position:absolute;left:2px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .shopbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+  .shopbar div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .3s}
+  .shop-row.on .name{text-decoration:line-through;color:var(--muted)}
+  .ed-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .ed-week .field{padding:10px 4px;text-align:center}
+  .tab{font-size:10.5px}
   .center{min-height:70dvh;display:grid;place-items:center;text-align:center}
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -299,6 +331,29 @@ function makeSupabaseApi() {
       must(await sb.from('protocols').update({ status: 'archived' }).eq('user_id', user_id).eq('status', 'published'));
       must(await sb.from('protocols').update({ status: 'published', data, ai_notes: null, acknowledged_at: null, published_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id));
       return { added: plan.inserts.length, updated: plan.updates.length };
+    },
+    // ---- Nutrition ----
+    async nutIntake(uid) { return must(await sb.from('nutrition_intakes').select('answers,created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle()); },
+    async mealPlan(uid) { return must(await sb.from('meal_plans').select('id,data,published_at').eq('user_id', uid).eq('status', 'published').order('published_at', { ascending: false }).limit(1).maybeSingle()); },
+    async submitNutIntake(answers) { must(await sb.from('nutrition_intakes').insert({ answers })); },
+    async callMealPlan(body) {
+      const { data } = await sb.auth.getSession();
+      const res = await fetch('/api/generate-mealplan', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (data.session?.access_token || '') }, body: JSON.stringify(body || {}) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Generating failed');
+      return out;
+    },
+    requestMealPlan() { this.callMealPlan({}).catch(() => {}); },
+    async shopProgress(planId) { const r = must(await sb.from('shopping_progress').select('checked').eq('plan_id', planId).maybeSingle()); return r?.checked || []; },
+    async saveShopProgress(planId, checked) { must(await sb.from('shopping_progress').upsert({ plan_id: planId, checked, updated_at: new Date().toISOString() }, { onConflict: 'plan_id,user_id' })); },
+    async coachNutIntakes() { return must(await sb.from('nutrition_intakes').select('user_id,answers,created_at').order('created_at', { ascending: false })); },
+    async coachMealPlans() { return must(await sb.from('meal_plans').select('id,user_id,status,data,ai_notes,error,published_at').neq('status', 'archived').order('created_at', { ascending: false })); },
+    async generateMealPlan(user_id, instructions) { return this.callMealPlan({ user_id, instructions }); },
+    async coachSaveMealPlan(id, data) { must(await sb.from('meal_plans').update({ data, updated_at: new Date().toISOString() }).eq('id', id)); },
+    async coachCreateMealPlanDraft(user_id, data) { must(await sb.from('meal_plans').insert({ user_id, status: 'draft', data })); },
+    async coachPublishMealPlan(id, user_id, data) {
+      must(await sb.from('meal_plans').update({ status: 'archived' }).eq('user_id', user_id).in('status', ['published', 'flagged']));
+      must(await sb.from('meal_plans').update({ status: 'published', data, ai_notes: null, published_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id));
     }
   };
 }
@@ -319,6 +374,28 @@ function makeDemoApi() {
   const programs = [];
   const suppIntakes = [{ user_id: 'sarah', answers: { budget: '$50–100 / month', goals: ['Recovery', 'Sleep'], current: 'none', medications: 'none', conditions: 'none', allergies_diet: 'none', caffeine: 'I handle caffeine fine', pregnant: 'No' } }];
   const protocols = [];
+  const nutIntakes = [], mealPlans = [], shopProg = {};
+  const M = (slot, title, ing, ins, c, p, cb, f) => ({ slot, title, ingredients: ing, instructions: ins, calories: c, protein_g: p, carbs_g: cb, fat_g: f });
+  const DEMO_MEALPLAN = { summary: 'Simple, high-protein meals you can prep twice a week. Rice bowls on training days, a little lighter on rest days.', gentle: false,
+    targets: { calories: 2675, protein_g: 160, carbs_g: 330, fat_g: 80 },
+    day_templates: [
+      { id: 'A', name: 'Training Day', meals: [
+        M('Breakfast', 'Protein oats', ['1 cup rolled oats', '1 scoop whey protein', '1 banana', '1 tbsp peanut butter'], 'Cook oats, stir in whey off the heat, top with banana and peanut butter.', 720, 45, 100, 16),
+        M('Lunch', 'Chicken rice bowl', ['6 oz chicken breast', '1.5 cups cooked rice', '1 cup broccoli', '2 tbsp teriyaki sauce'], 'Use prepped chicken and rice, microwave 2 min, add sauce.', 780, 55, 105, 10),
+        M('Snack', 'Greek yogurt & berries', ['1 cup 0% Greek yogurt', '1 cup mixed berries', '1 tbsp honey'], 'Mix and eat.', 300, 24, 45, 1),
+        M('Dinner', 'Steak, potatoes & salad', ['6 oz sirloin steak', '10 oz potatoes', '2 cups mixed greens', '1 tbsp olive oil'], 'Air fry potatoes 20 min at 400°F, sear steak 4 min per side.', 870, 48, 75, 40)] },
+      { id: 'R', name: 'Rest Day', meals: [
+        M('Breakfast', 'Eggs & toast', ['3 eggs', '2 slices whole-grain toast', '1 cup spinach'], 'Scramble eggs with spinach, serve with toast.', 520, 30, 35, 25),
+        M('Lunch', 'Turkey wrap', ['5 oz deli turkey', '1 large tortilla', '1 slice cheese', 'lettuce, tomato'], 'Assemble and roll.', 560, 45, 45, 18),
+        M('Snack', 'Protein shake', ['1 scoop whey', '1 cup milk'], 'Shake and drink.', 280, 32, 14, 9),
+        M('Dinner', 'Salmon & rice', ['6 oz salmon', '1 cup cooked rice', '1 cup green beans'], 'Bake salmon 12 min at 400°F.', 760, 42, 60, 30)] }],
+    week: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, i) => ({ day, template_id: [0, 1, 3, 4].includes(i) ? 'A' : 'R' })),
+    shopping_list: [
+      { section: 'Produce', items: [{ name: 'Bananas', qty: '1 bunch' }, { name: 'Broccoli', qty: '2 heads' }, { name: 'Mixed berries', qty: '2 lb (frozen ok)' }, { name: 'Spinach', qty: '1 bag' }] },
+      { section: 'Meat & Seafood', items: [{ name: 'Chicken breast', qty: '2 lb' }, { name: 'Sirloin steak', qty: '1.5 lb' }, { name: 'Salmon fillets', qty: '1 lb' }] },
+      { section: 'Dairy & Eggs', items: [{ name: 'Eggs', qty: '1 dozen' }, { name: '0% Greek yogurt', qty: '32 oz tub' }, { name: 'Milk', qty: '1/2 gallon' }] },
+      { section: 'Grains & Bread', items: [{ name: 'Rolled oats', qty: '1 canister' }, { name: 'White rice', qty: '2 lb bag' }, { name: 'Whole-grain bread', qty: '1 loaf' }] }],
+    prep_tips: ['Sunday + Wednesday: cook 2 lb chicken and a big pot of rice.', 'Portion lunches into containers so you can grab and go.'] };
   const DEMO_PROTOCOL = { summary: 'A simple, proven stack for recovery and sleep that fits your budget.', total_est_monthly_cost: 95, items: [
     { name: 'Creatine Monohydrate', dose: '5 g daily', timing: 'Morning', purpose: 'More strength and better recovery between sessions.', est_monthly_cost: 15, link: 'https://example.com/creatine' },
     { name: 'Whey Protein Isolate', dose: '1 scoop as needed to hit protein', timing: 'Post-workout', purpose: 'Makes hitting your protein target easy.', est_monthly_cost: 45, link: '' },
@@ -396,6 +473,27 @@ function makeDemoApi() {
       protocols.forEach(p => { if (p.user_id === user_id && p.status === 'published') p.status = 'archived'; });
       Object.assign(protocols.find(p => p.id === id), { status: 'published', data, ai_notes: null, acknowledged_at: null, published_at: new Date().toISOString() });
       return { added: plan.inserts.length, updated: plan.updates.length };
+    },
+    async nutIntake(uid) { return nutIntakes.find(x => x.user_id === uid) || null; },
+    async mealPlan(uid) { return mealPlans.find(p => p.user_id === uid && p.status === 'published') || null; },
+    async submitNutIntake(answers) { nutIntakes.unshift({ user_id: 'demo', answers }); },
+    requestMealPlan() { setTimeout(() => this.generateMealPlan('demo').catch(() => {}), 50); },
+    async shopProgress(planId) { return shopProg[planId] || []; },
+    async saveShopProgress(planId, checked) { shopProg[planId] = checked; },
+    async coachNutIntakes() { return nutIntakes; },
+    async coachMealPlans() { return mealPlans.filter(p => p.status !== 'archived'); },
+    async generateMealPlan(user_id) {
+      let row = mealPlans.find(p => p.user_id === user_id && ['draft', 'failed', 'generating', 'flagged'].includes(p.status));
+      if (!row) { row = { id: 'm' + (++n), user_id }; mealPlans.unshift(row); }
+      row.status = 'generating'; await wait(); await wait();
+      Object.assign(row, { status: 'draft', data: structuredClone(DEMO_MEALPLAN), ai_notes: 'Maintenance ≈ 2,450 kcal · BMI 24.4.\nNo allergies listed. Built around rice bowls since they love them.' });
+      return { ok: true };
+    },
+    async coachSaveMealPlan(id, data) { mealPlans.find(p => p.id === id).data = data; },
+    async coachCreateMealPlanDraft(user_id, data) { mealPlans.unshift({ id: 'm' + (++n), user_id, status: 'draft', data: structuredClone(data) }); },
+    async coachPublishMealPlan(id, user_id, data) {
+      mealPlans.forEach(p => { if (p.user_id === user_id && ['published', 'flagged'].includes(p.status)) p.status = 'archived'; });
+      Object.assign(mealPlans.find(p => p.id === id), { status: 'published', data, ai_notes: null, published_at: new Date().toISOString() });
     }
   };
 }
@@ -405,7 +503,7 @@ const api = DEMO ? makeDemoApi() : makeSupabaseApi();
 /* ==========================================================
    STATE + RENDERING
    ========================================================== */
-const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null };
+const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null, nutIntake: null, mealPlan: null };
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = (id, d) => id + '|' + d;
@@ -422,6 +520,7 @@ const ICON = {
   right: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>',
   today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   program: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>',
+  nutrition: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4.4 0-8-3.6-8-8 0-3 1.7-5.6 4.2-6.9C9.3 5.5 10.6 6 12 6s2.7-.5 3.8.1C18.3 7.4 20 10 20 13c0 4.4-3.6 8-8 8z"/><path d="M12 6c0-1.7.8-3 2.5-3.5"/></svg>',
   coach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg>',
   me: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
 };
@@ -497,13 +596,14 @@ function renderInactive() {
 
 /* ---------- Main shell ---------- */
 function renderShell() {
-  const tabs = S.profile?.is_coach ? ['today', 'program', 'coach', 'me'] : ['today', 'program', 'me'];
+  const tabs = S.profile?.is_coach ? ['today', 'program', 'nutrition', 'coach', 'me'] : ['today', 'program', 'nutrition', 'me'];
   $app.classList.toggle('wide', S.tab === 'coach');
   let body = '';
   if (S.tab === 'today') body = viewToday();
   if (S.tab === 'program') body = viewProgram();
   if (S.tab === 'me') body = viewMe();
   if (S.tab === 'coach') body = viewCoach();
+  if (S.tab === 'nutrition') body = viewNutrition();
   const first = (S.profile.full_name || '').split(' ')[0] || 'there';
   const tierLabel = S.profile.tier === 'transformation' ? 'Transformation' : S.profile.tier === 'fitness' ? 'Fitness' : 'Member';
   $app.innerHTML = `
@@ -514,7 +614,7 @@ function renderShell() {
     </div>
     ${body}
     <nav class="tabs"><div class="in" style="--tabs:${tabs.length}">
-      ${tabs.map(t => `<button class="tab ${S.tab === t ? 'on' : ''}" data-tab="${t}">${ICON[t]}${{ today: 'Today', program: 'Program', coach: 'Coach', me: 'Me' }[t]}</button>`).join('')}
+      ${tabs.map(t => `<button class="tab ${S.tab === t ? 'on' : ''}" data-tab="${t}">${ICON[t]}${{ today: 'Today', program: 'Program', nutrition: 'Nutrition', coach: 'Coach', me: 'Me' }[t]}</button>`).join('')}
     </div></nav>
     ${sheetHtml()}`;
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => {
@@ -522,8 +622,12 @@ function renderShell() {
     renderShell(); window.scrollTo(0, 0);
     if (S.tab === 'coach' && !C.loaded) { try { await loadCoach(); } catch (e) { toast("Couldn't load clients"); } renderShell(); }
     if (S.tab === 'program' && !S.program) { try { S.program = await api.program(S.user.id); } catch (e) {} if (S.tab === 'program') renderShell(); }
+    if (S.tab === 'nutrition') {
+      if (!S.mealPlan) { try { S.mealPlan = await api.mealPlan(S.user.id); } catch (e) {} }
+      await loadShopProgress(); if (S.tab === 'nutrition') renderShell();
+    }
   });
-  bindToday(); bindSheet(); bindMe(); bindProgram(); bindCoach();
+  bindToday(); bindSheet(); bindMe(); bindProgram(); bindCoach(); bindNutrition();
   maybeInstallHint();
 }
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning,' : h < 18 ? 'Good afternoon,' : 'Good evening,'; }
@@ -787,7 +891,7 @@ function bindPublished() {
 /* ==========================================================
    COACH TAB: review AI drafts, edit, regenerate, publish
    ========================================================== */
-const C = { clients: [], programs: {}, intakes: {}, protocols: {}, suppIntakes: {}, sel: null, edit: null, sedit: null, poll: null, loaded: false };
+const C = { clients: [], programs: {}, intakes: {}, protocols: {}, suppIntakes: {}, mealPlans: {}, nutIntakes: {}, sel: null, edit: null, sedit: null, nedit: null, poll: null, loaded: false };
 
 function clientStatus(c) {
   const ps = C.programs[c.id] || [];
@@ -802,6 +906,9 @@ function clientStatus(c) {
 async function loadCoach() {
   const [clients, programs, intakes, protocols, suppIntakes] = await Promise.all([api.coachClients(), api.coachPrograms(), api.coachIntakes(), api.coachProtocols().catch(() => []), api.coachSuppIntakes().catch(() => [])]);
   C.protocols = {}; (protocols || []).forEach(p => (C.protocols[p.user_id] ||= []).push(p));
+  const [mealPlans, nutIntakes] = await Promise.all([api.coachMealPlans().catch(() => []), api.coachNutIntakes().catch(() => [])]);
+  C.mealPlans = {}; (mealPlans || []).forEach(p => (C.mealPlans[p.user_id] ||= []).push(p));
+  C.nutIntakes = {}; (nutIntakes || []).forEach(i => { if (!C.nutIntakes[i.user_id]) C.nutIntakes[i.user_id] = i; });
   C.suppIntakes = {}; (suppIntakes || []).forEach(i => { if (!C.suppIntakes[i.user_id]) C.suppIntakes[i.user_id] = i; });
   C.clients = clients || [];
   C.programs = {}; (programs || []).forEach(p => (C.programs[p.user_id] ||= []).push(p));
@@ -812,16 +919,16 @@ function viewCoach() {
   if (!C.loaded) return `<div class="center" style="min-height:40dvh"><div class="spin"></div></div>`;
   if (C.sel) return viewCoachClient();
   const order = { hot: 0, bad: 1, warn: 2, '': 3, good: 4 };
-  const rows = C.clients.filter(c => c.id !== S.user.id || C.intakes[c.id] || C.suppIntakes[c.id])
-    .map(c => ({ c, st: clientStatus(c), ss: suppStatus(c) }))
-    .sort((a, b) => Math.min(order[a.st[1]], a.ss ? order[a.ss[1]] : 9) - Math.min(order[b.st[1]], b.ss ? order[b.ss[1]] : 9));
+  const rows = C.clients.filter(c => c.id !== S.user.id || C.intakes[c.id] || C.suppIntakes[c.id] || C.nutIntakes[c.id])
+    .map(c => ({ c, st: clientStatus(c), ss: suppStatus(c), ns: nutStatus(c) }))
+    .sort((a, b) => Math.min(order[a.st[1]], a.ss ? order[a.ss[1]] : 9, a.ns ? order[a.ns[1]] : 9) - Math.min(order[b.st[1]], b.ss ? order[b.ss[1]] : 9, b.ns ? order[b.ns[1]] : 9));
   return `
     <div class="sec"><h2>Clients</h2><button class="link" id="cRefresh">Refresh</button></div>
     <div class="list">
-      ${rows.map(({ c, st, ss }) => `
+      ${rows.map(({ c, st, ss, ns }) => `
         <button class="row client" data-client="${c.id}">
           <span style="flex:1;min-width:0"><div class="name">${esc(c.full_name || c.email)}</div><div class="dose">${esc(c.tier ? (c.tier === 'transformation' ? 'Transformation' : 'Fitness') : 'No tier')}${c.active ? '' : ' · inactive'}</div></span>
-          <span class="pills"><span class="pill ${st[1]}">${st[0]}</span>${ss ? `<span class="pill ${ss[1]}">${ss[0]}</span>` : ''}</span>
+          <span class="pills"><span class="pill ${st[1]}">${st[0]}</span>${ss ? `<span class="pill ${ss[1]}">${ss[0]}</span>` : ''}${ns ? `<span class="pill ${ns[1]}">${ns[0]}</span>` : ''}</span>
         </button>`).join('') || '<div class="empty"><b>No clients yet</b>Clients show up here once they\'re added.</div>'}
     </div>`;
 }
@@ -872,7 +979,8 @@ function viewCoachClient() {
     </details>` : ''}
     <div class="sec" style="margin-top:18px"><h2>Program</h2>${draft && draft.status !== 'generating' ? `<span class="pill hot">Draft, not visible to client</span>` : ''}</div>
     ${programPart}
-    ${viewCoachSupps(c)}`;
+    ${viewCoachSupps(c)}
+    ${viewCoachNutrition(c)}`;
 }
 
 /* ----- Editor ----- */
@@ -925,8 +1033,9 @@ function startPoll() {
     try { await loadCoach(); } catch (e) {}
     const d = (C.programs[C.sel] || []).find(p => ['draft', 'generating', 'failed'].includes(p.status));
     const sd = (C.protocols[C.sel] || []).find(p => ['draft', 'generating', 'failed'].includes(p.status));
-    const busy = d?.status === 'generating' || sd?.status === 'generating';
-    if (!busy || n > 40) { stopPoll(); C.edit = C.edit || (d?.data ? structuredClone(d.data) : null); C.sedit = C.sedit || (sd?.data ? structuredClone(sd.data) : null); }
+    const md = (C.mealPlans[C.sel] || []).find(p => ['draft', 'generating', 'failed'].includes(p.status));
+    const busy = d?.status === 'generating' || sd?.status === 'generating' || md?.status === 'generating';
+    if (!busy || n > 60) { stopPoll(); C.edit = C.edit || (d?.data ? structuredClone(d.data) : null); C.sedit = C.sedit || (sd?.data ? structuredClone(sd.data) : null); C.nedit = C.nedit || (md?.status === 'draft' && md.data ? structuredClone(md.data) : null); }
     if (S.tab === 'coach') renderShell();
   }, 5000);
 }
@@ -960,13 +1069,15 @@ function bindCoach() {
       C.edit = d?.data ? structuredClone(d.data) : (d ? { title: '', overview: '', days: [] } : null);
       const sd = (C.protocols[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
       C.sedit = sd?.data ? structuredClone(sd.data) : (sd ? { summary: '', items: [] } : null);
-      if ((C.programs[C.sel] || []).some(p => p.status === 'generating') || (C.protocols[C.sel] || []).some(p => p.status === 'generating')) startPoll();
+      const nd = (C.mealPlans[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
+      C.nedit = nd?.data ? structuredClone(nd.data) : null;
+      if ((C.programs[C.sel] || []).some(p => p.status === 'generating') || (C.protocols[C.sel] || []).some(p => p.status === 'generating') || (C.mealPlans[C.sel] || []).some(p => p.status === 'generating')) startPoll();
       renderShell(); window.scrollTo(0, 0);
     });
     return;
   }
-  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; C.sedit = null; renderShell(); };
-  bindCoachSupps();
+  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; C.sedit = null; C.nedit = null; renderShell(); };
+  bindCoachSupps(); bindCoachNutrition();
   $('cGen') && ($('cGen').onclick = () => generate(''));
   $('cEditPub') && ($('cEditPub').onclick = async () => {
     const pub = (C.programs[C.sel] || []).find(p => p.status === 'published');
@@ -1216,6 +1327,296 @@ function mergePlan(existing, items) {
   return { updates, inserts };
 }
 
+/* ==========================================================
+   NUTRITION: questionnaire → weekly meal plan → shopping list
+   ========================================================== */
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const todayName = () => WEEKDAYS[(new Date().getDay() + 6) % 7];
+const NUT_DISCLAIMER = 'This meal plan is general nutrition guidance, not medical advice. Zane is not a doctor or registered dietitian. If you have a medical condition, food allergy, or are pregnant or breastfeeding, talk to your doctor before changing your diet. Check every ingredient label for allergens.';
+const N = { view: 'plan', day: todayName(), openMeal: -1, checked: new Set(), loadedFor: null, saveT: null };
+
+function nutQuestions() {
+  const t = S.intake?.answers || {}, s = S.suppIntake?.answers || {};
+  const qs = [];
+  if (!t.sex) qs.push({ k: 'sex', q: 'Are you…', type: 'choice', opts: ['Male', 'Female', 'Prefer not to say'] });
+  if (!t.age) qs.push({ k: 'age', q: 'How old are you?', type: 'number', ph: '25' });
+  if (!t.height) qs.push({ k: 'height', q: 'How tall are you?', type: 'text', ph: `5'10"` });
+  if (!t.weight) qs.push({ k: 'weight', q: 'Current weight (lbs)?', type: 'number', ph: '180' });
+  qs.push(
+    { k: 'diet', q: 'How do you eat?', type: 'choice', opts: ['I eat everything', 'Vegetarian', 'Vegan', 'Pescatarian', 'Dairy-free', 'Gluten-free'] },
+    { k: 'avoid', q: "Foods you're allergic to or won't eat?", type: 'textarea', ph: 'e.g. shellfish allergy, hate mushrooms. Write "none" if none.' },
+    { k: 'loves', q: 'Foods you love and want in your plan?', type: 'textarea', ph: 'e.g. steak, rice bowls, Greek yogurt', optional: true },
+    { k: 'meals', q: 'How many times a day do you want to eat?', type: 'choice', opts: ['3 meals', '3 meals + 1 snack', '4 meals', '5 (meals + snacks)'] },
+    { k: 'cooking', q: 'How much time do you want to spend cooking?', type: 'choice', opts: ['Keep it super simple (under 15 min)', 'Some cooking is fine (15–30 min)', 'I enjoy cooking'] },
+    { k: 'prep', q: 'Do you meal prep?', type: 'choice', opts: ['I meal prep 1–2 times a week', 'I cook day by day', 'Mix of both'] },
+    { k: 'budget', q: "What's your weekly grocery budget?", type: 'choice', opts: ['Under $75 / week', '$75–125 / week', '$125–175 / week', '$175+ / week'] },
+    { k: 'medical', q: 'Any medical conditions that affect what you eat?', sub: 'e.g. diabetes, kidney disease, high blood pressure, IBS.', type: 'textarea', ph: 'List them, or write "none".' },
+    { k: 'eating_history', q: 'Have you ever struggled with an eating disorder or a difficult relationship with food?', sub: 'This stays between you and Zane. It helps him coach you the right way.', type: 'choice', opts: ['No', 'Yes', 'Prefer not to say'] },
+  );
+  if ((t.sex || '') !== 'Male' && !s.pregnant) qs.push({ k: 'pregnant', q: 'Are you pregnant or breastfeeding?', type: 'choice', opts: ['No', 'Yes', 'Not applicable'] });
+  return qs;
+}
+
+/* ---------- Client ---------- */
+function viewNutrition() {
+  if (Q.on && Q.kind === 'nutrition') return viewQuestion();
+  const p = S.mealPlan;
+  if (p) return N.view === 'shop' ? viewShopping(p) : viewMealPlan(p);
+  if (S.nutIntake) return `<div class="hero-card">
+      <div class="display" style="font-size:34px">Your meal plan is <span class="accent">being built.</span></div>
+      <p class="muted" style="margin-top:10px;line-height:1.55">Zane is personally reviewing your plan and shopping list. They'll show up right here once they're approved.</p></div>`;
+  if (!S.program || !S.protocol) return `<div class="hero-card">
+      <div style="color:var(--accent)">${ICON.nutrition.replace('<svg', '<svg width="40" height="40"')}</div>
+      <div class="display" style="font-size:34px;margin:12px 0 10px">Nutrition <span class="accent">unlocks next.</span></div>
+      <p class="muted" style="line-height:1.55">Your custom meal plan and shopping list unlock once your training program and supplement protocol are ready.</p>
+      <div class="steps" style="margin-top:16px">
+        <div class="st ${S.program ? 'done' : ''}"><i>${S.program ? '✓' : '1'}</i>Training program</div>
+        <div class="st ${S.protocol ? 'done' : ''}"><i>${S.protocol ? '✓' : '2'}</i>Supplement protocol</div>
+        <div class="st"><i>3</i>Meal plan & shopping list</div>
+      </div></div>`;
+  return `<div class="hero-card">
+      <div style="color:var(--accent)">${ICON.nutrition.replace('<svg', '<svg width="40" height="40"')}</div>
+      <div class="display" style="font-size:36px;margin:12px 0 10px">Let's build <span class="accent">your meal plan.</span></div>
+      <p class="muted" style="line-height:1.55;margin-bottom:22px">A weekly plan built around your goal, the foods you like, and your budget, plus a shopping list you can check off in the store.</p>
+      <button class="btn btn-primary" id="nStart">Start (about 2 min)</button></div>`;
+}
+
+function macroBar(label, val, target, unit = 'g') {
+  const pct = target ? Math.min(100, Math.round((val / target) * 100)) : 0;
+  return `<div class="mb"><div class="mb-top"><span>${label}</span><b>${Math.round(val)}${unit}${target ? ` <small>/ ${target}${unit}</small>` : ''}</b></div><div class="mb-bar"><div style="width:${pct}%"></div></div></div>`;
+}
+function viewMealPlan(p) {
+  const d = p.data || {}, tpls = d.day_templates || [], week = d.week || [];
+  const tid = (week.find(w => w.day === N.day) || {}).template_id;
+  const tpl = tpls.find(t => t.id === tid) || tpls[0] || { meals: [] };
+  const t = d.targets, tot = tpl.totals;
+  const total = (d.shopping_list || []).reduce((n, s) => n + s.items.length, 0);
+  return `
+    <div class="hero-card" style="padding:20px">
+      <div class="k" style="color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">Your Meal Plan</div>
+      ${d.summary ? `<p class="muted" style="line-height:1.55;margin-top:8px">${esc(d.summary)}</p>` : ''}
+      ${t && !d.gentle ? `<div class="targets">
+        <div class="kcal"><b>${t.calories}</b><small>calories / day</small></div>
+        <div class="macros"><span><b>${t.protein_g}g</b>protein</span><span><b>${t.carbs_g}g</b>carbs</span><span><b>${t.fat_g}g</b>fat</span></div>
+      </div>` : ''}
+    </div>
+    <button class="shop-cta" id="nShop"><span><b>Shopping List</b><small>${N.checked.size} of ${total} checked off</small></span><span class="chev">${ICON.right}</span></button>
+    <div class="daystrip">${WEEKDAYS.map(w => `<button class="dchip ${w === N.day ? 'on' : ''} ${w === todayName() ? 'today' : ''}" data-nday="${w}"><b>${w.slice(0, 3)}</b><small>${esc((week.find(x => x.day === w) || {}).template_id || '')}</small></button>`).join('')}</div>
+    <div class="sec"><h2>${esc(N.day)}</h2><span class="muted" style="font-size:13px">${esc(tpl.name || '')}</span></div>
+    ${tot && !d.gentle ? `<div class="card" style="padding:14px 16px">${macroBar('Calories', tot.calories, t?.calories, '')}${macroBar('Protein', tot.protein_g, t?.protein_g)}</div>` : ''}
+    <div class="list">
+      ${(tpl.meals || []).map((m, i) => `
+        <div class="day-card ${N.openMeal === i ? 'open' : ''}">
+          <button class="day-head" data-meal="${i}">
+            <span><small style="text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--accent)">${esc(m.slot)}</small><b>${esc(m.title)}</b>${!d.gentle && m.calories ? `<small>${Math.round(m.calories)} kcal · ${Math.round(m.protein_g)}g protein</small>` : ''}</span>
+            <span class="chev">${ICON.right}</span>
+          </button>
+          ${N.openMeal === i ? `<div class="day-body">
+            <ul class="ing">${(m.ingredients || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+            ${m.instructions ? `<div class="ex-note" style="margin-top:8px">${esc(m.instructions)}</div>` : ''}
+            ${!d.gentle && m.calories ? `<div class="ex-meta" style="margin-top:10px"><span>${Math.round(m.carbs_g)}g carbs</span><span>${Math.round(m.fat_g)}g fat</span></div>` : ''}
+          </div>` : ''}
+        </div>`).join('')}
+    </div>
+    ${(d.prep_tips || []).length ? `<div class="card" style="margin-top:16px"><div class="k">Prep tips</div><ul class="ing" style="margin-top:8px">${d.prep_tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+    <p class="fine">${esc(NUT_DISCLAIMER)}</p>`;
+}
+const shopKey = (sec, name) => normName(sec) + ':' + normName(name);
+function viewShopping(p) {
+  const list = p.data?.shopping_list || [];
+  const total = list.reduce((n, s) => n + s.items.length, 0);
+  return `
+    <div class="qhead"><button class="link" id="nBack">‹ Meal plan</button><button class="link" id="nReset" style="color:var(--muted)">Reset list</button></div>
+    <div class="display" style="font-size:34px;margin-bottom:8px">Shopping <span class="accent">List</span></div>
+    <div class="shopbar"><div style="width:${total ? (N.checked.size / total) * 100 : 0}%"></div></div>
+    <p class="muted" style="font-size:13px;margin:8px 0 16px">${N.checked.size} of ${total} items · for the whole week</p>
+    ${list.map(sec => `
+      <div class="sec" style="margin-top:14px"><h2 style="font-size:18px">${esc(sec.section)}</h2></div>
+      <div class="list">${sec.items.map(it => { const k = shopKey(sec.section, it.name), on = N.checked.has(k); return `
+        <button class="row ${on ? 'on' : ''} shop-row" data-shop="${esc(k)}">
+          <span class="box">${ICON.check}</span>
+          <span style="flex:1"><div class="name">${esc(it.name)}</div>${it.qty ? `<div class="dose">${esc(it.qty)}</div>` : ''}</span>
+        </button>`; }).join('')}</div>`).join('')}
+    ${total && N.checked.size === total ? `<div class="notice" style="margin-top:16px;text-align:center">All done. Go prep and lock in. 💪</div>` : ''}`;
+}
+async function loadShopProgress() {
+  if (!S.mealPlan || N.loadedFor === S.mealPlan.id) return;
+  N.loadedFor = S.mealPlan.id;
+  try { const arr = await api.shopProgress(S.mealPlan.id); N.checked = new Set(arr || []); } catch (e) { N.checked = new Set(); }
+}
+function saveShopSoon() {
+  clearTimeout(N.saveT);
+  N.saveT = setTimeout(() => api.saveShopProgress(S.mealPlan.id, [...N.checked]).catch(() => toast("Couldn't sync your list. It'll retry on your next tap.")), 500);
+}
+function bindNutrition() {
+  if (S.tab !== 'nutrition') return;
+  if (Q.on && Q.kind === 'nutrition') return bindQuestion();
+  const $ = id => document.getElementById(id);
+  $('nStart') && ($('nStart').onclick = () => startQuestions('nutrition', nutQuestions(), submitNutIntake));
+  $('nShop') && ($('nShop').onclick = () => { N.view = 'shop'; renderShell(); window.scrollTo(0, 0); });
+  $('nBack') && ($('nBack').onclick = () => { N.view = 'plan'; renderShell(); window.scrollTo(0, 0); });
+  $('nReset') && ($('nReset').onclick = () => { if (confirm('Uncheck everything for a new shopping trip?')) { N.checked.clear(); saveShopSoon(); renderShell(); } });
+  document.querySelectorAll('[data-nday]').forEach(b => b.onclick = () => { N.day = b.dataset.nday; N.openMeal = -1; renderShell(); });
+  document.querySelectorAll('[data-meal]').forEach(b => b.onclick = () => { const i = +b.dataset.meal; N.openMeal = N.openMeal === i ? -1 : i; renderShell(); });
+  document.querySelectorAll('[data-shop]').forEach(b => b.onclick = () => {
+    const k = b.dataset.shop; N.checked.has(k) ? N.checked.delete(k) : N.checked.add(k);
+    if (navigator.vibrate) navigator.vibrate(8);
+    saveShopSoon(); const y = window.scrollY; renderShell(); window.scrollTo(0, y);
+  });
+}
+async function submitNutIntake() {
+  const btn = document.getElementById('qNext'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const answers = { ...Q.a };
+    await api.submitNutIntake(answers);
+    S.nutIntake = { answers }; Q.on = false;
+    api.requestMealPlan();
+    renderShell(); window.scrollTo(0, 0); toast('Submitted. Zane is on it.');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
+    renderErr("Couldn't submit. Check your connection and try again.");
+  }
+}
+
+/* ---------- Coach ---------- */
+function nutStatus(c) {
+  const ps = C.mealPlans[c.id] || [];
+  if (ps[0]?.status === 'generating') return ['Meals: drafting…', 'warn'];
+  if (ps[0]?.status === 'failed') return ['Meals: failed', 'bad'];
+  if (ps.some(p => p.status === 'flagged')) return ['Meals: check in', 'bad'];
+  if (ps.some(p => p.status === 'draft')) return ['Review meals', 'hot'];
+  if (ps.some(p => p.status === 'published')) return null;
+  if (C.nutIntakes[c.id]) return ['Meals: needs draft', 'hot'];
+  return null;
+}
+function viewCoachNutrition(c) {
+  const ps = C.mealPlans[c.id] || [];
+  const draft = ps.find(p => ['draft', 'generating', 'failed', 'flagged'].includes(p.status));
+  const pub = ps.find(p => p.status === 'published');
+  const intake = C.nutIntakes[c.id];
+  const label = k => (nutQuestions().concat([{ k: 'sex', q: 'Sex' }, { k: 'age', q: 'Age' }, { k: 'height', q: 'Height' }, { k: 'weight', q: 'Weight' }, { k: 'pregnant', q: 'Pregnant/breastfeeding' }]).find(q => q.k === k) || { q: k }).q;
+  let part = '';
+  if (draft?.status === 'generating') part = `<div class="card center" style="min-height:140px"><div><div class="spin" style="margin:0 auto 14px"></div><b>Generating meal plan…</b><div class="muted" style="font-size:13px;margin-top:6px">Meal plans take 1–2 minutes.</div></div></div>`;
+  else if (draft?.status === 'flagged') part = `<div class="notice bad"><b>Personal check-in needed.</b> ${esc(intake?.answers?.eating_history === 'Prefer not to say' ? 'They preferred not to answer' : 'They said yes')} to the eating-history question, so no calorie plan was made. Reach out to them first, and consider referring them to a registered dietitian.</div>
+      <button class="btn btn-ghost" id="nGen">Create a gentle plan (no calories or weighing)</button>`;
+  else if (draft?.status === 'failed' && !C.nedit) part = `<div class="notice bad">Generating failed: ${esc(draft.error || 'unknown error')}</div><button class="btn btn-primary" id="nGen">Try Generating Again</button>`;
+  else if (draft && C.nedit) part = nutEditorHtml(C.nedit, draft.ai_notes, intake);
+  else part = `${pub ? `<div class="card"><div class="k">Published meal plan</div><div class="v txt">${(pub.data?.day_templates || []).map(t => esc(t.name)).join(' · ')}</div>
+        <button class="btn btn-ghost" id="nEditPub" style="margin-top:12px">Edit as New Version</button></div>` : ''}
+      ${intake ? `<button class="btn btn-primary" id="nGen">${pub ? 'Generate New Meal Plan' : 'Generate Meal Plan'}</button>`
+        : `<div class="empty"><b>Waiting on their nutrition questions</b>Their Nutrition tab unlocks after their program and supplement protocol are published.</div>`}`;
+  return `
+    ${intake ? `<details class="card" style="margin-top:6px"><summary><span class="k">Nutrition answers</span></summary>
+      <div class="answers">${Object.entries(intake.answers || {}).map(([k, v]) => `<div><span>${esc(label(k))}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}</div></details>` : ''}
+    <div class="sec" style="margin-top:22px"><h2>Nutrition</h2>${draft && draft.status === 'draft' ? `<span class="pill hot">Draft, not visible to client</span>` : ''}</div>
+    ${part}`;
+}
+function nutEditorHtml(d, notes) {
+  const f = (path, val, ph = '', cls = '') => `<input class="field ${cls}" data-npath="${path}" value="${esc(val ?? '')}" placeholder="${esc(ph)}" />`;
+  const t = (path, val, rows = 3, ph = '') => `<textarea class="field" data-npath="${path}" rows="${rows}" placeholder="${esc(ph)}">${esc(val ?? '')}</textarea>`;
+  const ids = (d.day_templates || []).map(x => x.id);
+  return `
+    ${notes ? `<div class="notice"><b>Notes for you</b> (the client never sees these)<br>${esc(notes).replace(/\n/g, '<br>')}</div>` : ''}
+    <div class="card ed">
+      <label>Summary (client sees this)</label>${t('summary', d.summary)}
+      ${d.targets ? `<div class="ed-4">
+        <div><label>Calories</label>${f('targets.calories', d.targets.calories)}</div>
+        <div><label>Protein g</label>${f('targets.protein_g', d.targets.protein_g)}</div>
+        <div><label>Carbs g</label>${f('targets.carbs_g', d.targets.carbs_g)}</div>
+        <div><label>Fat g</label>${f('targets.fat_g', d.targets.fat_g)}</div></div>` : `<p class="muted" style="font-size:13px;margin-top:8px">Gentle plan: no numbers are shown to this client.</p>`}
+    </div>
+    <div class="card ed"><div class="k">Week</div>
+      <div class="ed-week">${(d.week || []).map((w, i) => `<div><label>${w.day.slice(0, 3)}</label><select class="field" data-npath="week.${i}.template_id">${ids.map(id => `<option ${id === w.template_id ? 'selected' : ''}>${esc(id)}</option>`).join('')}</select></div>`).join('')}</div>
+    </div>
+    ${(d.day_templates || []).map((tp, ti) => `
+      <div class="card ed">
+        <div class="ed-dayhead">${f(`day_templates.${ti}.name`, tp.name, 'Day name', 'strong')}<span class="pill">${esc(tp.id)}</span></div>
+        ${tp.totals ? `<div class="muted" style="font-size:12px;margin-top:6px">Totals: ${tp.totals.calories} kcal · ${tp.totals.protein_g}p / ${tp.totals.carbs_g}c / ${tp.totals.fat_g}f (updates when saved)</div>` : ''}
+        ${(tp.meals || []).map((m, mi) => `
+          <div class="ed-ex">
+            <div class="ed-exhead">${f(`day_templates.${ti}.meals.${mi}.slot`, m.slot, 'Slot')}${f(`day_templates.${ti}.meals.${mi}.title`, m.title, 'Meal', 'strong')}
+              <div class="ed-btns"><button class="x" data-ndelmeal="${ti}.${mi}" aria-label="Remove">✕</button></div></div>
+            <label>Ingredients (one per line)</label>
+            <textarea class="field" data-nlines="day_templates.${ti}.meals.${mi}.ingredients" rows="4">${esc((m.ingredients || []).join('\n'))}</textarea>
+            <label>Instructions</label>${t(`day_templates.${ti}.meals.${mi}.instructions`, m.instructions, 2)}
+            ${d.gentle ? '' : `<div class="ed-4">
+              <div><label>kcal</label>${f(`day_templates.${ti}.meals.${mi}.calories`, m.calories)}</div>
+              <div><label>Protein</label>${f(`day_templates.${ti}.meals.${mi}.protein_g`, m.protein_g)}</div>
+              <div><label>Carbs</label>${f(`day_templates.${ti}.meals.${mi}.carbs_g`, m.carbs_g)}</div>
+              <div><label>Fat</label>${f(`day_templates.${ti}.meals.${mi}.fat_g`, m.fat_g)}</div></div>`}
+          </div>`).join('')}
+        <button class="link" data-naddmeal="${ti}" style="margin-top:8px">+ Add meal</button>
+      </div>`).join('')}
+    <div class="card ed"><div class="k">Shopping list</div><p class="muted" style="font-size:12px;margin-top:6px">One item per line, like: Chicken breast — 3 lb</p>
+      ${(d.shopping_list || []).map((sec, si) => `<label>${esc(sec.section)}</label><textarea class="field" data-nshop="${si}" rows="${Math.min(10, Math.max(3, sec.items.length + 1))}">${esc(sec.items.map(it => it.qty ? `${it.name} — ${it.qty}` : it.name).join('\n'))}</textarea>`).join('')}
+    </div>
+    <div class="card ed"><label>Prep tips (one per line)</label><textarea class="field" data-nlines="prep_tips" rows="3">${esc((d.prep_tips || []).join('\n'))}</textarea></div>
+    <div class="sticky-actions"><button class="btn btn-ghost" id="nSave">Save Draft</button><button class="btn btn-primary" id="nPublish">Publish Meal Plan</button></div>
+    <div class="card"><div class="k">Rework this meal plan</div>
+      <textarea class="field" id="nInstr" rows="3" style="margin-top:10px" placeholder='e.g. "No fish, swap lunch for something she can eat cold at work, keep groceries under $100"'></textarea>
+      <button class="btn btn-ghost" id="nRegen" style="margin-top:10px">Regenerate Meal Plan</button></div>`;
+}
+function recalcTotals(d) {
+  (d.day_templates || []).forEach(tp => {
+    if (d.gentle) { tp.totals = null; return; }
+    const s = k => Math.round((tp.meals || []).reduce((a, m) => a + (Number(m[k]) || 0), 0));
+    tp.totals = { calories: s('calories'), protein_g: s('protein_g'), carbs_g: s('carbs_g'), fat_g: s('fat_g') };
+  });
+  return d;
+}
+async function generateMealPlan(instructions) {
+  const c = C.sel; (C.mealPlans[c] ||= []);
+  const d = C.mealPlans[c].find(p => ['draft', 'failed', 'flagged'].includes(p.status));
+  if (d) d.status = 'generating'; else C.mealPlans[c].unshift({ user_id: c, status: 'generating' });
+  renderShell(); startPoll();
+  try {
+    await api.generateMealPlan(c, instructions);
+    await loadCoach();
+    const nd = (C.mealPlans[c] || []).find(p => p.status === 'draft');
+    C.nedit = nd?.data ? structuredClone(nd.data) : null;
+    stopPoll(); renderShell(); toast('Meal plan ready to review');
+  } catch (e) { stopPoll(); await loadCoach().catch(() => {}); renderShell(); toast(e.message || 'Generating failed'); }
+}
+function bindCoachNutrition() {
+  const $ = id => document.getElementById(id);
+  $('nGen') && ($('nGen').onclick = () => generateMealPlan(''));
+  $('nEditPub') && ($('nEditPub').onclick = async () => {
+    const pub = (C.mealPlans[C.sel] || []).find(p => p.status === 'published');
+    try { await api.coachCreateMealPlanDraft(C.sel, pub.data); await loadCoach(); C.nedit = structuredClone(pub.data); renderShell(); }
+    catch (e) { toast("Couldn't create a new version"); }
+  });
+  if (!C.nedit) return;
+  const numKeys = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
+  const setN = (path, val) => { const ks = path.split('.'); let o = C.nedit; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; const k = ks[ks.length - 1]; o[k] = numKeys.includes(k) ? (Number(val) || 0) : val; };
+  document.querySelectorAll('[data-npath]').forEach(el => { el.oninput = el.onchange = () => setN(el.dataset.npath, el.value); });
+  document.querySelectorAll('[data-nlines]').forEach(el => { el.oninput = () => setN(el.dataset.nlines, el.value.split('\n').map(x => x.trim()).filter(Boolean)); });
+  document.querySelectorAll('[data-nshop]').forEach(el => { el.oninput = () => {
+    C.nedit.shopping_list[+el.dataset.nshop].items = el.value.split('\n').map(x => x.trim()).filter(Boolean).map(line => { const [name, ...rest] = line.split(/\s+[—–-]\s+/); return { name: name.trim(), qty: rest.join(' - ').trim() }; });
+  }; });
+  document.querySelectorAll('[data-ndelmeal]').forEach(b => b.onclick = () => { const [t, m] = b.dataset.ndelmeal.split('.').map(Number); C.nedit.day_templates[t].meals.splice(m, 1); recalcTotals(C.nedit); renderShell(); });
+  document.querySelectorAll('[data-naddmeal]').forEach(b => b.onclick = () => { C.nedit.day_templates[+b.dataset.naddmeal].meals.push({ slot: 'Snack', title: '', ingredients: [], instructions: '', calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }); renderShell(); });
+  const draftRow = () => (C.mealPlans[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
+  const clean = () => {
+    const d = recalcTotals(structuredClone(C.nedit));
+    d.day_templates.forEach(tp => { tp.meals = (tp.meals || []).filter(m => String(m.title).trim()); });
+    d.shopping_list = (d.shopping_list || []).map(s => ({ ...s, items: s.items.filter(i => i.name) })).filter(s => s.items.length);
+    return d;
+  };
+  $('nSave') && ($('nSave').onclick = async () => { try { const d = clean(); await api.coachSaveMealPlan(draftRow().id, d); C.nedit = d; renderShell(); toast('Draft saved'); } catch (e) { toast("Couldn't save: " + (e.message || 'unknown error')); } });
+  $('nPublish') && ($('nPublish').onclick = async () => {
+    const d = clean();
+    if (!d.day_templates.some(t => t.meals.length)) return toast('Add at least one meal');
+    if (!confirm('Publish this meal plan and shopping list to the client?')) return;
+    try { await api.coachPublishMealPlan(draftRow().id, C.sel, d); await loadCoach(); C.nedit = null; renderShell(); toast('Published. The client can see it now.'); }
+    catch (e) { toast("Couldn't publish: " + (e.message || 'unknown error')); }
+  });
+  $('nRegen') && ($('nRegen').onclick = async () => {
+    const instr = $('nInstr').value.trim(); if (!instr) return toast('Type what you want changed');
+    try { await api.coachSaveMealPlan(draftRow().id, clean()); } catch (e) {}
+    generateMealPlan(instr);
+  });
+}
+
 /* ---------- Me ---------- */
 function viewMe() {
   const p = S.profile;
@@ -1228,7 +1629,7 @@ function viewMe() {
     <button class="btn btn-ghost" id="out" style="margin-top:14px">Sign Out</button>`;
 }
 function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; }
-async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = null; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
+async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = S.nutIntake = S.mealPlan = null; N.loadedFor = null; N.checked = new Set(); N.view = 'plan'; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
 
 /* ---------- Streak ---------- */
 function computeStreak() {
@@ -1261,11 +1662,13 @@ async function loadData() {
   ]);
   S.intake = intake; S.program = program;
   [S.suppIntake, S.protocol] = await Promise.all([api.suppIntake(S.user.id).catch(() => null), api.protocol(S.user.id).catch(() => null)]);
+  [S.nutIntake, S.mealPlan] = await Promise.all([api.nutIntake(S.user.id).catch(() => null), api.mealPlan(S.user.id).catch(() => null)]);
   // Self-heal: if they submitted a questionnaire but nothing's published yet, nudge the server.
   // (The server skips this if a draft already exists or is in progress, so it never double-drafts.)
   if (!DEMO) {
     if (S.intake && !S.program) api.requestDraft();
     if (S.suppIntake && !S.protocol) api.requestProtocol();
+    if (S.nutIntake && !S.mealPlan) api.requestMealPlan();
   }
   S.sups = sups || [];
   S.logs = new Set((logs || []).map(l => key(l.supplement_id, l.log_date)));
