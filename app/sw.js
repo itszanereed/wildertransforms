@@ -1,6 +1,6 @@
 // Service worker: lets the app open fast and survive a bad connection.
 // Bump VERSION whenever you upload new app files so phones pick up the update.
-const VERSION = 'wt-app-v8';
+const VERSION = 'wt-app-v9';
 const SHELL = ['/app/', '/app/index.html', '/app/config.js', '/app/manifest.webmanifest', '/app/apple-touch-icon.png', '/app/icon-192.png'];
 
 self.addEventListener('install', (e) => {
