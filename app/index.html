@@ -237,6 +237,71 @@
   .ed-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
   .ed-week .field{padding:10px 4px;text-align:center}
   .tab{font-size:10.5px}
+
+  /* ---- Meal photos ---- */
+  .meal-hero{position:relative;display:flex;align-items:flex-end;justify-content:space-between;width:100%;height:170px;padding:16px;text-align:left;background-size:cover;background-position:center;border-radius:0}
+  .meal-hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,9,0) 25%,rgba(10,10,9,.88) 100%)}
+  .meal-hero > *{position:relative}
+  .meal-txt b{display:block;font-size:18px;line-height:1.2}
+  .meal-txt small{display:block;color:#d8d2c4;font-size:13px;margin-top:3px}
+  .meal-txt .slot{text-transform:uppercase;letter-spacing:.12em;font-weight:800;font-size:11px;color:var(--accent);margin:0 0 4px}
+  .day-head .meal-txt small{color:var(--muted)}
+  .day-head .meal-txt .slot{color:var(--accent)}
+  .meal-hero .chev{color:#fff;background:rgba(0,0,0,.35);width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+  .day-card.meal.open .meal-hero .chev{transform:rotate(90deg);background:var(--accent);color:#120800}
+  .credit{font-size:11px;color:#7d786c;margin-top:12px}
+  .credit a{color:#9d988b}
+  .ed-photo{display:flex;gap:10px;align-items:flex-end;margin-bottom:10px}
+  .ed-photo img,.ph-empty{width:72px;height:56px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:var(--card-2)}
+  .ph-empty{display:grid;place-items:center;font-size:10px;color:var(--muted);border:1px dashed #3a382f}
+  .ph-btn{width:auto;padding:11px 12px;font-size:13px;flex:0 0 auto}
+
+  /* ---- Injection tracker ---- */
+  .inj{background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:18px;padding:4px 16px 8px}
+  .inj-head{display:flex;justify-content:space-between;align-items:center;padding:12px 0 6px}
+  .inj-head b{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:20px}
+  .inj-row{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+  .inj-row .name{font-weight:700;font-size:16px}
+  .inj-status{font-size:13px;color:var(--muted);margin-top:3px}
+  .inj-status .ok{color:var(--good);font-weight:600}
+  .accent-t{color:var(--accent)}
+  .inj-last{font-size:12px;color:#7d786c;margin-top:2px}
+  .inj-btn{width:auto;padding:11px 18px;font-size:14px;flex:0 0 auto}
+  .ov-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:70;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .ov{position:fixed;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:71;max-width:460px;margin:0 auto;background:var(--bg-2);border:1px solid var(--line);border-radius:22px;padding:24px 20px;max-height:88dvh;overflow:auto}
+  .ov.full{top:calc(var(--safe-t) + 12px);bottom:calc(var(--safe-b) + 12px);transform:none;max-height:none}
+  .ov-icon{font-size:40px;margin-bottom:8px}
+  .ov-title{font-size:32px;margin:0 0 12px}
+  .ov-p{line-height:1.55;margin-bottom:10px;font-size:16px}
+  .ov-top{display:flex;justify-content:space-between;align-items:center}
+  .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+  .daypick{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .dp{padding:11px 0;border-radius:10px;background:var(--card);border:1px solid var(--line);font-weight:700;font-size:13px}
+  .dp.on{background:var(--accent);border-color:var(--accent);color:#120800}
+  .chipbtn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  .sitepick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .sp{position:relative;text-align:left;padding:13px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+  .sp.on{border-color:var(--accent);background:linear-gradient(90deg,rgba(255,106,26,.14),transparent),var(--card)}
+  .sp i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#120800;display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 auto}
+  .bodymap{width:100%;max-width:400px;display:block;margin:14px auto 6px}
+  .bodymap .fig *{fill:#1f1e1a;stroke:#3a382f;stroke-width:1}
+  .bodymap .fig .seam{fill:none}
+  .bodymap .fig .navel{fill:#3a382f;stroke:none}
+  .bodymap .cap{fill:#7d786c;font-size:9px;text-anchor:middle;font-family:var(--body)}
+  .bodymap .site circle{fill:#2b2a25;stroke:#4a4840;stroke-width:1}
+  .bodymap .site.off{display:none}
+  .bodymap .site.avail circle{fill:#3a382f;stroke:#6b675c}
+  .bodymap .site.last circle{fill:#6b675c;stroke:#cfc9bb;stroke-width:2}
+  .bodymap .site.next circle{fill:var(--accent);stroke:#ffd2b5;stroke-width:1.5}
+  .bodymap .site.next .pulse{fill:rgba(255,106,26,.3);stroke:none;animation:pp 1.6s ease-out infinite;transform-origin:center;transform-box:fill-box}
+  @keyframes pp{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.6);opacity:0}}
+  .sitelist{display:flex;flex-direction:column;gap:8px}
+  .sl{display:flex;align-items:center;gap:8px;padding:14px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:600;text-align:left}
+  .sl span{flex:1}
+  .sl.on{border-color:var(--accent);background:linear-gradient(90deg,rgba(255,106,26,.16),transparent),var(--card)}
+  .sl em{font-style:normal;font-size:11px;font-weight:800;padding:4px 8px;border-radius:999px}
+  .tag-next{background:rgba(255,106,26,.16);color:var(--accent)}
+  .tag-last{background:var(--card-2);color:var(--muted)}
   .center{min-height:70dvh;display:grid;place-items:center;text-align:center}
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -350,7 +415,28 @@ function makeSupabaseApi() {
     async coachMealPlans() { return must(await sb.from('meal_plans').select('id,user_id,status,data,ai_notes,error,published_at').neq('status', 'archived').order('created_at', { ascending: false })); },
     async generateMealPlan(user_id, instructions) { return this.callMealPlan({ user_id, instructions }); },
     async coachSaveMealPlan(id, data) { must(await sb.from('meal_plans').update({ data, updated_at: new Date().toISOString() }).eq('id', id)); },
+    async coachResetNutrition(user_id) {
+      must(await sb.from('meal_plans').update({ status: 'archived' }).eq('user_id', user_id).in('status', ['flagged', 'failed', 'draft', 'generating']));
+      must(await sb.from('nutrition_intakes').delete().eq('user_id', user_id));
+    },
+    async mealPhotos(items) {
+      const { data } = await sb.auth.getSession();
+      const res = await fetch('/api/meal-photo', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (data.session?.access_token || '') }, body: JSON.stringify({ items }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Photo search failed');
+      return out.photos || [];
+    },
     async coachCreateMealPlanDraft(user_id, data) { must(await sb.from('meal_plans').insert({ user_id, status: 'draft', data })); },
+    // ---- Injection tracker (private) ----
+    async settings() { return must(await sb.from('user_settings').select('*').maybeSingle()); },
+    async saveSettings(st) { const { data: ses } = await sb.auth.getSession(); must(await sb.from('user_settings').upsert({ user_id: ses.session.user.id, peptides_answered: !!st.peptides_answered, peptides_enabled: !!st.peptides_enabled, peptide_terms_at: st.peptide_terms_at || null, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })); },
+    async compounds() { return must(await sb.from('peptide_compounds').select('id,name,dose,days,sites').eq('archived', false).order('created_at')); },
+    async addCompound(row) { return must(await sb.from('peptide_compounds').insert(row).select('id,name,dose,days,sites').single()); },
+    async updateCompound(id, row) { must(await sb.from('peptide_compounds').update(row).eq('id', id)); },
+    async archiveCompound(id) { must(await sb.from('peptide_compounds').update({ archived: true }).eq('id', id)); },
+    async injLogs() { return must(await sb.from('injection_logs').select('id,compound_id,site,injected_at').order('injected_at', { ascending: false }).limit(300)); },
+    async logInjection(compound_id, site) { return must(await sb.from('injection_logs').insert({ compound_id, site }).select('id,compound_id,site,injected_at').single()); },
+    async deleteInjection(id) { must(await sb.from('injection_logs').delete().eq('id', id)); },
     async coachPublishMealPlan(id, user_id, data) {
       must(await sb.from('meal_plans').update({ status: 'archived' }).eq('user_id', user_id).in('status', ['published', 'flagged']));
       must(await sb.from('meal_plans').update({ status: 'published', data, ai_notes: null, published_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id));
@@ -375,13 +461,14 @@ function makeDemoApi() {
   const suppIntakes = [{ user_id: 'sarah', answers: { budget: '$50–100 / month', goals: ['Recovery', 'Sleep'], current: 'none', medications: 'none', conditions: 'none', allergies_diet: 'none', caffeine: 'I handle caffeine fine', pregnant: 'No' } }];
   const protocols = [];
   const nutIntakes = [], mealPlans = [], shopProg = {};
+  let demoSettings = null; const demoComps = [], demoLogs = [];
   const M = (slot, title, ing, ins, c, p, cb, f) => ({ slot, title, ingredients: ing, instructions: ins, calories: c, protein_g: p, carbs_g: cb, fat_g: f });
   const DEMO_MEALPLAN = { summary: 'Simple, high-protein meals you can prep twice a week. Rice bowls on training days, a little lighter on rest days.', gentle: false,
     targets: { calories: 2675, protein_g: 160, carbs_g: 330, fat_g: 80 },
     day_templates: [
       { id: 'A', name: 'Training Day', meals: [
-        M('Breakfast', 'Protein oats', ['1 cup rolled oats', '1 scoop whey protein', '1 banana', '1 tbsp peanut butter'], 'Cook oats, stir in whey off the heat, top with banana and peanut butter.', 720, 45, 100, 16),
-        M('Lunch', 'Chicken rice bowl', ['6 oz chicken breast', '1.5 cups cooked rice', '1 cup broccoli', '2 tbsp teriyaki sauce'], 'Use prepped chicken and rice, microwave 2 min, add sauce.', 780, 55, 105, 10),
+        Object.assign(M('Breakfast', 'Protein oats', ['1 cup rolled oats', '1 scoop whey protein', '1 banana', '1 tbsp peanut butter'], 'Cook oats, stir in whey off the heat, top with banana and peanut butter.', 720, 45, 100, 16), { photo: { url: 'https://images.pexels.com/demo/oats.jpg', thumb: 'https://images.pexels.com/demo/oats.jpg', credit: 'Demo Photographer', link: 'https://www.pexels.com', query: 'protein oats', page: 1 } }),
+        Object.assign(M('Lunch', 'Chicken rice bowl', ['6 oz chicken breast', '1.5 cups cooked rice', '1 cup broccoli', '2 tbsp teriyaki sauce'], 'Use prepped chicken and rice, microwave 2 min, add sauce.', 780, 55, 105, 10), { photo: { url: 'https://images.pexels.com/demo/bowl.jpg', thumb: 'https://images.pexels.com/demo/bowl.jpg', credit: 'Demo Photographer', link: 'https://www.pexels.com', query: 'chicken rice bowl', page: 1 } }),
         M('Snack', 'Greek yogurt & berries', ['1 cup 0% Greek yogurt', '1 cup mixed berries', '1 tbsp honey'], 'Mix and eat.', 300, 24, 45, 1),
         M('Dinner', 'Steak, potatoes & salad', ['6 oz sirloin steak', '10 oz potatoes', '2 cups mixed greens', '1 tbsp olive oil'], 'Air fry potatoes 20 min at 400°F, sear steak 4 min per side.', 870, 48, 75, 40)] },
       { id: 'R', name: 'Rest Day', meals: [
@@ -490,7 +577,18 @@ function makeDemoApi() {
       return { ok: true };
     },
     async coachSaveMealPlan(id, data) { mealPlans.find(p => p.id === id).data = data; },
+    async coachResetNutrition(user_id) { mealPlans.forEach(p => { if (p.user_id === user_id && p.status !== 'published') p.status = 'archived'; }); for (let i = nutIntakes.length - 1; i >= 0; i--) if (nutIntakes[i].user_id === user_id) nutIntakes.splice(i, 1); },
+    async mealPhotos(items) { await wait(); return items.map((x, k) => ({ url: `https://images.pexels.com/demo/${k + (x.page || 1)}.jpg`, thumb: `https://images.pexels.com/demo/${k + (x.page || 1)}.jpg`, credit: 'Demo Photographer', link: 'https://www.pexels.com', query: x.query, page: x.page || 1 })); },
     async coachCreateMealPlanDraft(user_id, data) { mealPlans.unshift({ id: 'm' + (++n), user_id, status: 'draft', data: structuredClone(data) }); },
+    async settings() { return demoSettings; },
+    async saveSettings(st) { demoSettings = { ...st }; },
+    async compounds() { return demoComps.slice(); },
+    async addCompound(row) { const c = { id: 'c' + (++n), ...row }; demoComps.push(c); return c; },
+    async updateCompound(id, row) { Object.assign(demoComps.find(c => c.id === id), row); },
+    async archiveCompound(id) { const i = demoComps.findIndex(c => c.id === id); if (i > -1) demoComps.splice(i, 1); },
+    async injLogs() { return demoLogs.slice(); },
+    async logInjection(compound_id, site) { const l = { id: 'l' + (++n), compound_id, site, injected_at: new Date().toISOString() }; demoLogs.unshift(l); return l; },
+    async deleteInjection(id) { const i = demoLogs.findIndex(l => l.id === id); if (i > -1) demoLogs.splice(i, 1); },
     async coachPublishMealPlan(id, user_id, data) {
       mealPlans.forEach(p => { if (p.user_id === user_id && ['published', 'flagged'].includes(p.status)) p.status = 'archived'; });
       Object.assign(mealPlans.find(p => p.id === id), { status: 'published', data, ai_notes: null, published_at: new Date().toISOString() });
@@ -503,7 +601,7 @@ const api = DEMO ? makeDemoApi() : makeSupabaseApi();
 /* ==========================================================
    STATE + RENDERING
    ========================================================== */
-const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null, nutIntake: null, mealPlan: null };
+const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null, nutIntake: null, mealPlan: null, settings: null, compounds: [], injLogs: [], overlay: null, pepReady: false };
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = (id, d) => id + '|' + d;
@@ -616,7 +714,8 @@ function renderShell() {
     <nav class="tabs"><div class="in" style="--tabs:${tabs.length}">
       ${tabs.map(t => `<button class="tab ${S.tab === t ? 'on' : ''}" data-tab="${t}">${ICON[t]}${{ today: 'Today', program: 'Program', nutrition: 'Nutrition', coach: 'Coach', me: 'Me' }[t]}</button>`).join('')}
     </div></nav>
-    ${sheetHtml()}`;
+    ${sheetHtml()}
+    ${overlayHtml()}`;
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => {
     S.tab = b.dataset.tab; if (S.tab !== 'coach') stopPoll();
     renderShell(); window.scrollTo(0, 0);
@@ -627,7 +726,8 @@ function renderShell() {
       await loadShopProgress(); if (S.tab === 'nutrition') renderShell();
     }
   });
-  bindToday(); bindSheet(); bindMe(); bindProgram(); bindCoach(); bindNutrition();
+  bindToday(); bindSheet(); bindMe(); bindProgram(); bindCoach(); bindNutrition(); bindOverlay();
+  document.body.style.overflow = S.overlay ? 'hidden' : '';
   maybeInstallHint();
 }
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning,' : h < 18 ? 'Good afternoon,' : 'Good evening,'; }
@@ -666,6 +766,7 @@ function viewToday() {
         <div class="msg">${msg}</div>
       </div>
     </div>
+    ${injectionsCard()}
     ${protocolCard()}
     <div class="sec"><h2>Supplements</h2><button class="link" id="edit">${total ? 'Edit' : '+ Add'}</button></div>
     <div class="list">
@@ -1351,7 +1452,8 @@ function nutQuestions() {
     { k: 'prep', q: 'Do you meal prep?', type: 'choice', opts: ['I meal prep 1–2 times a week', 'I cook day by day', 'Mix of both'] },
     { k: 'budget', q: "What's your weekly grocery budget?", type: 'choice', opts: ['Under $75 / week', '$75–125 / week', '$125–175 / week', '$175+ / week'] },
     { k: 'medical', q: 'Any medical conditions that affect what you eat?', sub: 'e.g. diabetes, kidney disease, high blood pressure, IBS.', type: 'textarea', ph: 'List them, or write "none".' },
-    { k: 'eating_history', q: 'Have you ever struggled with an eating disorder or a difficult relationship with food?', sub: 'This stays between you and Zane. It helps him coach you the right way.', type: 'choice', opts: ['No', 'Yes', 'Prefer not to say'] },
+    { k: 'eating_struggles', q: 'What do you struggle with most when it comes to eating?', sub: 'Pick up to 3. Zane builds your plan around these.', type: 'multi', max: 3, opts: ['Eating enough / low appetite', 'Cravings / overeating', 'Staying consistent', 'Late-night eating', 'Skipping meals', 'Nothing really'] },
+    { k: 'eating_history', q: 'Have you ever had an eating disorder (like anorexia, bulimia, or binge eating disorder), diagnosed or not?', sub: "This is only about eating disorders, not everyday struggles like appetite or cravings. It stays between you and Zane.", type: 'choice', opts: ['No', 'Yes', 'Prefer not to say'] },
   );
   if ((t.sex || '') !== 'Male' && !s.pregnant) qs.push({ k: 'pregnant', q: 'Are you pregnant or breastfeeding?', type: 'choice', opts: ['No', 'Yes', 'Not applicable'] });
   return qs;
@@ -1405,18 +1507,22 @@ function viewMealPlan(p) {
     <div class="sec"><h2>${esc(N.day)}</h2><span class="muted" style="font-size:13px">${esc(tpl.name || '')}</span></div>
     ${tot && !d.gentle ? `<div class="card" style="padding:14px 16px">${macroBar('Calories', tot.calories, t?.calories, '')}${macroBar('Protein', tot.protein_g, t?.protein_g)}</div>` : ''}
     <div class="list">
-      ${(tpl.meals || []).map((m, i) => `
-        <div class="day-card ${N.openMeal === i ? 'open' : ''}">
-          <button class="day-head" data-meal="${i}">
-            <span><small style="text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--accent)">${esc(m.slot)}</small><b>${esc(m.title)}</b>${!d.gentle && m.calories ? `<small>${Math.round(m.calories)} kcal · ${Math.round(m.protein_g)}g protein</small>` : ''}</span>
+      ${(tpl.meals || []).map((m, i) => {
+        const open = N.openMeal === i, kc = !d.gentle && m.calories ? `${Math.round(m.calories)} kcal · ${Math.round(m.protein_g)}g protein` : '';
+        const ph = m.photo && safeLink(m.photo.url);
+        return `<div class="day-card meal ${open ? 'open' : ''} ${ph ? 'has-photo' : ''}">
+          <button class="${ph ? 'meal-hero' : 'day-head'}" data-meal="${i}" ${ph ? `style="background-image:url('${esc(ph)}')"` : ''}>
+            <span class="meal-txt"><small class="slot">${esc(m.slot)}</small><b>${esc(m.title)}</b>${kc ? `<small>${kc}</small>` : ''}</span>
             <span class="chev">${ICON.right}</span>
           </button>
-          ${N.openMeal === i ? `<div class="day-body">
+          ${open ? `<div class="day-body" ${ph ? 'style="padding-top:14px"' : ''}>
             <ul class="ing">${(m.ingredients || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
             ${m.instructions ? `<div class="ex-note" style="margin-top:8px">${esc(m.instructions)}</div>` : ''}
             ${!d.gentle && m.calories ? `<div class="ex-meta" style="margin-top:10px"><span>${Math.round(m.carbs_g)}g carbs</span><span>${Math.round(m.fat_g)}g fat</span></div>` : ''}
+            ${ph && m.photo.credit ? `<div class="credit">Photo: <a href="${esc(safeLink(m.photo.link))}" target="_blank" rel="noopener">${esc(m.photo.credit)} on ${esc(m.photo.provider || 'Pexels')}</a> · similar dish</div>` : ''}
           </div>` : ''}
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>
     ${(d.prep_tips || []).length ? `<div class="card" style="margin-top:16px"><div class="k">Prep tips</div><ul class="ing" style="margin-top:8px">${d.prep_tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
     <p class="fine">${esc(NUT_DISCLAIMER)}</p>`;
@@ -1498,12 +1604,14 @@ function viewCoachNutrition(c) {
   let part = '';
   if (draft?.status === 'generating') part = `<div class="card center" style="min-height:140px"><div><div class="spin" style="margin:0 auto 14px"></div><b>Generating meal plan…</b><div class="muted" style="font-size:13px;margin-top:6px">Meal plans take 1–2 minutes.</div></div></div>`;
   else if (draft?.status === 'flagged') part = `<div class="notice bad"><b>Personal check-in needed.</b> ${esc(intake?.answers?.eating_history === 'Prefer not to say' ? 'They preferred not to answer' : 'They said yes')} to the eating-history question, so no calorie plan was made. Reach out to them first, and consider referring them to a registered dietitian.</div>
-      <button class="btn btn-ghost" id="nGen">Create a gentle plan (no calories or weighing)</button>`;
+      <button class="btn btn-ghost" id="nGen">Create a gentle plan (no calories or weighing)</button>
+      <button class="btn" id="nRetake" style="margin-top:8px;color:var(--muted)">Let them retake the nutrition questions</button>`;
   else if (draft?.status === 'failed' && !C.nedit) part = `<div class="notice bad">Generating failed: ${esc(draft.error || 'unknown error')}</div><button class="btn btn-primary" id="nGen">Try Generating Again</button>`;
   else if (draft && C.nedit) part = nutEditorHtml(C.nedit, draft.ai_notes, intake);
   else part = `${pub ? `<div class="card"><div class="k">Published meal plan</div><div class="v txt">${(pub.data?.day_templates || []).map(t => esc(t.name)).join(' · ')}</div>
         <button class="btn btn-ghost" id="nEditPub" style="margin-top:12px">Edit as New Version</button></div>` : ''}
-      ${intake ? `<button class="btn btn-primary" id="nGen">${pub ? 'Generate New Meal Plan' : 'Generate Meal Plan'}</button>`
+      ${intake ? `<button class="btn btn-primary" id="nGen">${pub ? 'Generate New Meal Plan' : 'Generate Meal Plan'}</button>
+        <button class="btn" id="nRetake" style="margin-top:8px;color:var(--muted)">Let them retake the nutrition questions</button>`
         : `<div class="empty"><b>Waiting on their nutrition questions</b>Their Nutrition tab unlocks after their program and supplement protocol are published.</div>`}`;
   return `
     ${intake ? `<details class="card" style="margin-top:6px"><summary><span class="k">Nutrition answers</span></summary>
@@ -1517,6 +1625,7 @@ function nutEditorHtml(d, notes) {
   const ids = (d.day_templates || []).map(x => x.id);
   return `
     ${notes ? `<div class="notice"><b>Notes for you</b> (the client never sees these)<br>${esc(notes).replace(/\n/g, '<br>')}</div>` : ''}
+    ${(d.day_templates || []).some(tp => (tp.meals || []).some(m => !m.photo)) ? `<button class="btn btn-ghost" id="nPhotos" style="margin-bottom:12px">📸 Add photos to meals without one</button>` : ''}
     <div class="card ed">
       <label>Summary (client sees this)</label>${t('summary', d.summary)}
       ${d.targets ? `<div class="ed-4">
@@ -1534,6 +1643,11 @@ function nutEditorHtml(d, notes) {
         ${tp.totals ? `<div class="muted" style="font-size:12px;margin-top:6px">Totals: ${tp.totals.calories} kcal · ${tp.totals.protein_g}p / ${tp.totals.carbs_g}c / ${tp.totals.fat_g}f (updates when saved)</div>` : ''}
         ${(tp.meals || []).map((m, mi) => `
           <div class="ed-ex">
+            <div class="ed-photo">
+              ${m.photo && safeLink(m.photo.thumb || m.photo.url) ? `<img src="${esc(safeLink(m.photo.thumb || m.photo.url))}" alt="" />` : `<div class="ph-empty">No photo</div>`}
+              <div style="flex:1;min-width:0"><label style="margin-top:0">Photo search</label>${f(`day_templates.${ti}.meals.${mi}.photo_query`, m.photo_query || m.title, 'e.g. chicken rice bowl')}</div>
+              <button class="btn btn-ghost ph-btn" data-nphoto="${ti}.${mi}">↻ ${m.photo ? 'Different' : 'Find'}</button>
+            </div>
             <div class="ed-exhead">${f(`day_templates.${ti}.meals.${mi}.slot`, m.slot, 'Slot')}${f(`day_templates.${ti}.meals.${mi}.title`, m.title, 'Meal', 'strong')}
               <div class="ed-btns"><button class="x" data-ndelmeal="${ti}.${mi}" aria-label="Remove">✕</button></div></div>
             <label>Ingredients (one per line)</label>
@@ -1580,6 +1694,11 @@ async function generateMealPlan(instructions) {
 function bindCoachNutrition() {
   const $ = id => document.getElementById(id);
   $('nGen') && ($('nGen').onclick = () => generateMealPlan(''));
+  $('nRetake') && ($('nRetake').onclick = async () => {
+    if (!confirm("Clear their nutrition answers so they can retake the questions? Any unpublished meal plan draft is removed. A published plan stays until you publish a new one.")) return;
+    try { await api.coachResetNutrition(C.sel); if (C.sel === S.user.id) { S.nutIntake = null; } await loadCoach(); C.nedit = null; renderShell(); toast('Done. Next time they open the app, they can retake the questions.'); }
+    catch (e) { toast("Couldn't reset: " + (e.message || 'unknown error')); }
+  });
   $('nEditPub') && ($('nEditPub').onclick = async () => {
     const pub = (C.mealPlans[C.sel] || []).find(p => p.status === 'published');
     try { await api.coachCreateMealPlanDraft(C.sel, pub.data); await loadCoach(); C.nedit = structuredClone(pub.data); renderShell(); }
@@ -1595,6 +1714,20 @@ function bindCoachNutrition() {
   }; });
   document.querySelectorAll('[data-ndelmeal]').forEach(b => b.onclick = () => { const [t, m] = b.dataset.ndelmeal.split('.').map(Number); C.nedit.day_templates[t].meals.splice(m, 1); recalcTotals(C.nedit); renderShell(); });
   document.querySelectorAll('[data-naddmeal]').forEach(b => b.onclick = () => { C.nedit.day_templates[+b.dataset.naddmeal].meals.push({ slot: 'Snack', title: '', ingredients: [], instructions: '', calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }); renderShell(); });
+  document.querySelectorAll('[data-nphoto]').forEach(b => b.onclick = async () => {
+    const [ti, mi] = b.dataset.nphoto.split('.').map(Number), m = C.nedit.day_templates[ti].meals[mi];
+    const query = (m.photo_query || m.title || '').trim(); if (!query) return toast('Type a photo search first');
+    const page = m.photo && String(m.photo.query || '').toLowerCase() === query.toLowerCase() ? (m.photo.page || 1) + 1 : 1;
+    b.disabled = true; b.textContent = '…';
+    try { const [ph] = await api.mealPhotos([{ query, page }]); if (ph) { m.photo = ph; renderShell(); } else { toast('No photo found. Try different words.'); b.disabled = false; b.textContent = '↻ Find'; } }
+    catch (e) { toast(e.message || "Couldn't get a photo"); b.disabled = false; b.textContent = '↻ Find'; }
+  });
+  $('nPhotos') && ($('nPhotos').onclick = async () => {
+    const meals = C.nedit.day_templates.flatMap(tp => tp.meals || []).filter(m => !m.photo && (m.photo_query || m.title));
+    $('nPhotos').disabled = true; $('nPhotos').textContent = 'Finding photos…';
+    try { const photos = await api.mealPhotos(meals.map(m => ({ query: m.photo_query || m.title }))); let got = 0; meals.forEach((m, k) => { if (photos[k]) { m.photo = photos[k]; got++; } }); renderShell(); toast(`Added ${got} photo${got === 1 ? '' : 's'}. Save or publish to keep them.`); }
+    catch (e) { toast(e.message || "Couldn't get photos"); renderShell(); }
+  });
   const draftRow = () => (C.mealPlans[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
   const clean = () => {
     const d = recalcTotals(structuredClone(C.nedit));
@@ -1617,6 +1750,238 @@ function bindCoachNutrition() {
   });
 }
 
+/* ==========================================================
+   INJECTION TRACKER (private to each user)
+   ========================================================== */
+const SITES = ['Left abdomen', 'Right abdomen', 'Left love handle', 'Right love handle', 'Left thigh', 'Right thigh', 'Left glute', 'Right glute', 'Left delt', 'Right delt'];
+// Positions on the body map (shown as you look down at yourself: your left is on the left)
+const SITE_XY = {
+  'Left delt': [27, 40], 'Right delt': [73, 40], 'Left love handle': [27, 93], 'Right love handle': [73, 93],
+  'Left abdomen': [41, 88], 'Right abdomen': [59, 88], 'Left thigh': [40, 140], 'Right thigh': [60, 140],
+  'Left glute': [159, 114], 'Right glute': [181, 114],
+};
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const dowIdx = (d = new Date()) => (d.getDay() + 6) % 7;
+const PEP_TERMS = `The injection tracker is a personal log so you can keep track of what you take and where you inject. It is not medical advice. Zane and Wilder Transforms do not recommend, prescribe, sell, or give dosing guidance for any peptide, hormone, or medication. Many peptides are not approved by the FDA for human use. Only use injectable products under the supervision of a licensed healthcare provider, and follow their instructions for dosing, injection technique, and site rotation. Stop and get medical help if you have redness that spreads, swelling, fever, or any other bad reaction. What you enter here is private to you. Your coach cannot see it.`;
+const P = { edit: null, logFor: null, pick: null };
+
+const pepLast = cid => S.injLogs.find(l => l.compound_id === cid) || null;
+function pepNext(c) {
+  const sites = c.sites || []; if (!sites.length) return null;
+  const last = pepLast(c.id); if (!last) return sites[0];
+  const i = sites.indexOf(last.site); return sites[(i + 1) % sites.length] || sites[0];
+}
+const sameDay = (a, b) => iso(new Date(a)) === iso(b);
+const timeStr = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function whenStr(t) {
+  const d = new Date(t), today = new Date(), y = new Date(); y.setDate(y.getDate() - 1);
+  if (sameDay(d, today)) return `today ${timeStr(d)}`;
+  if (sameDay(d, y)) return `yesterday ${timeStr(d)}`;
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + timeStr(d);
+}
+function daysLabel(days) {
+  if (!days || !days.length) return 'As needed';
+  if (days.length === 7) return 'Every day';
+  return days.slice().sort((a, b) => a - b).map(d => DAY_SHORT[d]).join(', ');
+}
+function nextDueLabel(c) {
+  if (!c.days?.length) return '';
+  for (let k = 1; k <= 7; k++) { const d = (dowIdx() + k) % 7; if (c.days.includes(d)) return k === 1 ? 'tomorrow' : DAY_SHORT[d]; }
+  return '';
+}
+
+/* ---------- Today card ---------- */
+function injectionsCard() {
+  if (!S.settings?.peptides_enabled) return '';
+  const list = S.compounds || [];
+  return `<div class="inj">
+    <div class="inj-head"><b>Injections</b><button class="link" id="pepManage">Manage</button></div>
+    ${!list.length ? `<div class="inj-row"><span class="muted" style="font-size:14px">Add what you're on to start tracking your sites.</span><button class="btn btn-primary inj-btn" id="pepAddFirst">Add</button></div>` : ''}
+    ${list.map(c => {
+      const last = pepLast(c.id), doneToday = last && sameDay(last.injected_at, new Date());
+      const due = !c.days?.length || c.days.includes(dowIdx());
+      const next = pepNext(c);
+      let status;
+      if (doneToday) status = `<span class="ok">✓ Done ${timeStr(last.injected_at)} · ${esc(last.site)}</span>`;
+      else if (due) status = `<span>${c.days?.length ? 'Due today' : 'As needed'}${next ? ` · Next: <b class="accent-t">${esc(next)}</b>` : ''}</span>`;
+      else status = `<span>Next due ${nextDueLabel(c)}${next ? ` · Next site: ${esc(next)}` : ''}</span>`;
+      return `<div class="inj-row">
+        <div style="flex:1;min-width:0"><div class="name">${esc(c.name)}${c.dose ? ` <small class="muted">${esc(c.dose)}</small>` : ''}</div><div class="inj-status">${status}</div>
+          ${last && !doneToday ? `<div class="inj-last">Last: ${esc(last.site)}, ${whenStr(last.injected_at)}</div>` : ''}</div>
+        <button class="btn ${doneToday ? 'btn-ghost' : 'btn-primary'} inj-btn" data-pepl="${c.id}">${doneToday ? 'Again' : 'Log'}</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* ---------- Body map ---------- */
+function bodyMap(sites, next, last) {
+  const dot = (s) => {
+    const [x, y] = SITE_XY[s] || []; if (x == null) return '';
+    const cls = s === next ? 'next' : s === last ? 'last' : sites.includes(s) ? 'avail' : 'off';
+    return `<g class="site ${cls}">${s === next ? `<circle cx="${x}" cy="${y}" r="12" class="pulse"/>` : ''}<circle cx="${x}" cy="${y}" r="7"/></g>`;
+  };
+  const fig = (ox, back) => `<g transform="translate(${ox},0)" class="fig">
+      <circle cx="50" cy="16" r="10"/>
+      <path d="M28 32 Q50 25 72 32 L79 70 Q77 98 72 114 L28 114 Q23 98 21 70 Z"/>
+      <path d="M28 33 L14 78 L20 80 L33 46 Z"/><path d="M72 33 L86 78 L80 80 L67 46 Z"/>
+      <path d="M30 112 L49 112 L47 188 L37 188 Z"/><path d="M51 112 L70 112 L63 188 L53 188 Z"/>
+      ${back ? '<path d="M36 102 Q50 126 64 102" class="seam"/>' : '<circle cx="50" cy="80" r="1.8" class="navel"/>'}
+    </g>`;
+  return `<svg viewBox="0 0 220 196" class="bodymap" aria-hidden="true">
+    ${fig(0, false)}${fig(120, true)}
+    <text x="50" y="195" class="cap">Front</text><text x="170" y="195" class="cap">Back</text>
+    ${SITES.map(dot).join('')}
+  </svg>`;
+}
+
+/* ---------- Overlays ---------- */
+function overlayHtml() {
+  const o = S.overlay; if (!o) return '';
+  let inner = '';
+  if (o === 'pep-ask') inner = `
+    <div class="ov-icon">💉</div>
+    <div class="display ov-title">Quick <span class="accent">question.</span></div>
+    <p class="muted ov-p">Are you currently using peptides or other injectable therapies (like GH, TRT, or prescribed injections)?</p>
+    <p class="muted" style="font-size:13px;margin-bottom:18px">If you are, you can turn on the injection tracker. It remembers which site you used last so you always know where to inject next.</p>
+    <button class="btn btn-primary" id="pepYes">Yes, I am</button>
+    <button class="btn btn-ghost" id="pepNo" style="margin-top:10px">No</button>`;
+  if (o === 'pep-terms') inner = `
+    <div class="display ov-title">Injection <span class="accent">tracker.</span></div>
+    <p class="disclaimer-text" style="max-height:34dvh">${esc(PEP_TERMS)}</p>
+    <label class="check-line"><input type="checkbox" id="pepAge" /> <span>I'm 18 or older.</span></label>
+    <label class="check-line" style="margin-top:10px"><input type="checkbox" id="pepAgree" /> <span>I understand this is a personal log, not medical advice, and I'll follow my healthcare provider's instructions.</span></label>
+    <button class="btn btn-primary" id="pepAccept" disabled style="margin-top:16px">Accept & Set Up</button>
+    <button class="btn" id="pepLater" style="margin-top:6px;color:var(--muted)">Not now</button>`;
+  if (o === 'pep-setup') inner = `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">Your <span class="accent">injections</span></div><button class="link" id="pepDone">Done</button></div>
+    <div class="list" style="margin-top:14px">${(S.compounds || []).map(c => `
+      <div class="edit-row"><div style="min-width:0"><div class="name">${esc(c.name)}${c.dose ? ` <small class="muted">${esc(c.dose)}</small>` : ''}</div>
+        <div class="dose">${daysLabel(c.days)} · ${(c.sites || []).length} sites</div></div>
+        <div style="display:flex;gap:4px"><button class="link" data-pepedit="${c.id}">Edit</button><button class="del" data-pepdel="${c.id}">Remove</button></div></div>`).join('') || '<p class="muted">Nothing added yet.</p>'}</div>
+    <button class="btn btn-primary" id="pepNew" style="margin-top:16px">+ Add a peptide / injection</button>`;
+  if (o === 'pep-form') { const e = P.edit; inner = `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">${e.id ? 'Edit' : 'Add'} <span class="accent">injection</span></div><button class="link" id="pepCancel">Cancel</button></div>
+    <label class="lbl">Name</label><input class="field" id="pepName" maxlength="60" placeholder="e.g. GH" value="${esc(e.name)}" />
+    <label class="lbl">Dose <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">(optional, your own notes, as prescribed)</span></label>
+    <input class="field" id="pepDose" maxlength="60" placeholder="Your own notes" value="${esc(e.dose || '')}" />
+    <label class="lbl">Which days?</label>
+    <div class="daypick">${DAY_SHORT.map((d, i) => `<button class="dp ${e.days.includes(i) ? 'on' : ''}" data-pepday="${i}">${d}</button>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="chipbtn" id="pepEvery">Every day</button><button class="chipbtn" id="pepAsNeeded">As needed</button></div>
+    <label class="lbl">Injection sites <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">(tap in the order you rotate)</span></label>
+    <div class="sitepick">${SITES.map(s => { const n = e.sites.indexOf(s); return `<button class="sp ${n > -1 ? 'on' : ''}" data-pepsite="${esc(s)}">${n > -1 ? `<i>${n + 1}</i>` : ''}${esc(s)}</button>`; }).join('')}</div>
+    <div class="err" id="err"></div>
+    <button class="btn btn-primary" id="pepSave" style="margin-top:6px">Save</button>`; }
+  if (o === 'pep-log') {
+    const c = (S.compounds || []).find(x => x.id === P.logFor); if (!c) return '';
+    const last = pepLast(c.id), next = pepNext(c);
+    inner = `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">Log <span class="accent">${esc(c.name)}</span></div><button class="link" id="pepClose">Close</button></div>
+    ${last ? `<p class="muted" style="font-size:13px;margin:6px 0 0">Last time: <b style="color:var(--text)">${esc(last.site)}</b>, ${whenStr(last.injected_at)}</p>` : ''}
+    ${bodyMap(c.sites || [], P.pick || next, last?.site)}
+    <p class="muted" style="font-size:11px;text-align:center;margin:-4px 0 12px">Shown as you look down at yourself. Orange = selected, gray ring = last time.</p>
+    <div class="sitelist">${(c.sites || []).map(s => `
+      <button class="sl ${s === (P.pick || next) ? 'on' : ''}" data-peppick="${esc(s)}"><span>${esc(s)}</span>
+        ${s === next ? '<em class="tag-next">Next up</em>' : ''}${last && s === last.site ? '<em class="tag-last">Last time</em>' : ''}</button>`).join('') || '<p class="muted">No sites set. Edit this injection to add your rotation.</p>'}</div>
+    ${(c.sites || []).length ? `<button class="btn btn-primary" id="pepLogNow" style="margin-top:14px">Log ${esc(P.pick || next)} now</button>` : ''}`;
+  }
+  if (o === 'pep-history') inner = `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">Injection <span class="accent">history</span></div><button class="link" id="pepClose">Close</button></div>
+    <div class="list" style="margin-top:14px">${S.injLogs.slice(0, 40).map(l => { const c = (S.compounds || []).find(x => x.id === l.compound_id); return `
+      <div class="edit-row"><div><div class="name">${esc(l.site)}</div><div class="dose">${esc(c ? c.name : 'Removed')} · ${whenStr(l.injected_at)}</div></div><button class="del" data-pepundo="${l.id}">Delete</button></div>`; }).join('') || '<p class="muted">No injections logged yet.</p>'}</div>`;
+  const full = ['pep-setup', 'pep-form', 'pep-log', 'pep-history'].includes(o);
+  return `<div class="ov-bg"></div><div class="ov ${full ? 'full' : ''}">${inner}</div>`;
+}
+
+async function saveSettings(fields) {
+  S.settings = { ...(S.settings || {}), ...fields };
+  try { await api.saveSettings(S.settings); } catch (e) { toast("Couldn't save that setting. Check your connection."); }
+}
+function openOverlay(o) { S.overlay = o; renderShell(); const el = document.querySelector('.ov'); if (el) el.scrollTop = 0; }
+function closeOverlay() { S.overlay = null; P.edit = null; P.logFor = null; P.pick = null; renderShell(); }
+
+function bindOverlay() {
+  const $ = id => document.getElementById(id);
+  // Today card + Me tab entry points (bound every render)
+  $('pepManage') && ($('pepManage').onclick = () => openOverlay('pep-setup'));
+  $('pepAddFirst') && ($('pepAddFirst').onclick = () => { P.edit = { name: '', dose: '', days: [], sites: [] }; openOverlay('pep-form'); });
+  document.querySelectorAll('[data-pepl]').forEach(b => b.onclick = () => { P.logFor = b.dataset.pepl; P.pick = null; openOverlay('pep-log'); });
+  $('pepTurnOn') && ($('pepTurnOn').onclick = () => S.settings?.peptide_terms_at ? (saveSettings({ peptides_enabled: true, peptides_answered: true }), openOverlay('pep-setup')) : openOverlay('pep-terms'));
+  $('pepTurnOff') && ($('pepTurnOff').onclick = async () => { if (confirm('Turn off the injection tracker? Your history is kept if you turn it back on.')) { await saveSettings({ peptides_enabled: false }); renderShell(); } });
+  $('pepHistory') && ($('pepHistory').onclick = () => openOverlay('pep-history'));
+  $('pepSetup2') && ($('pepSetup2').onclick = () => openOverlay('pep-setup'));
+  if (!S.overlay) return;
+
+  $('pepYes') && ($('pepYes').onclick = () => openOverlay('pep-terms'));
+  $('pepNo') && ($('pepNo').onclick = async () => { await saveSettings({ peptides_answered: true, peptides_enabled: false }); closeOverlay(); toast('Got it. You can turn it on anytime in the Me tab.'); });
+  const age = $('pepAge'), agree = $('pepAgree'), acc = $('pepAccept');
+  if (age && agree && acc) { const upd = () => { acc.disabled = !(age.checked && agree.checked); }; age.onchange = upd; agree.onchange = upd;
+    acc.onclick = async () => { await saveSettings({ peptides_answered: true, peptides_enabled: true, peptide_terms_at: new Date().toISOString() }); P.edit = { name: '', dose: '', days: [], sites: [] }; openOverlay(S.compounds?.length ? 'pep-setup' : 'pep-form'); }; }
+  $('pepLater') && ($('pepLater').onclick = async () => { await saveSettings({ peptides_answered: true }); closeOverlay(); toast('No problem. Turn it on anytime in the Me tab.'); });
+
+  $('pepDone') && ($('pepDone').onclick = closeOverlay);
+  $('pepNew') && ($('pepNew').onclick = () => { P.edit = { name: '', dose: '', days: [], sites: [] }; openOverlay('pep-form'); });
+  document.querySelectorAll('[data-pepedit]').forEach(b => b.onclick = () => { const c = S.compounds.find(x => x.id === b.dataset.pepedit); P.edit = { id: c.id, name: c.name, dose: c.dose || '', days: [...(c.days || [])], sites: [...(c.sites || [])] }; openOverlay('pep-form'); });
+  document.querySelectorAll('[data-pepdel]').forEach(b => b.onclick = async () => {
+    const c = S.compounds.find(x => x.id === b.dataset.pepdel);
+    if (!confirm(`Remove ${c.name}? Its history stays in your log.`)) return;
+    try { await api.archiveCompound(c.id); S.compounds = S.compounds.filter(x => x.id !== c.id); renderShell(); } catch (e) { toast("Couldn't remove it. Try again."); }
+  });
+
+  if (S.overlay === 'pep-form') {
+    const e = P.edit, keep = () => { e.name = $('pepName').value; e.dose = $('pepDose').value; };
+    $('pepCancel').onclick = () => openOverlay('pep-setup');
+    document.querySelectorAll('[data-pepday]').forEach(b => b.onclick = () => { keep(); const d = +b.dataset.pepday; e.days = e.days.includes(d) ? e.days.filter(x => x !== d) : [...e.days, d]; renderShell(); });
+    $('pepEvery').onclick = () => { keep(); e.days = [0, 1, 2, 3, 4, 5, 6]; renderShell(); };
+    $('pepAsNeeded').onclick = () => { keep(); e.days = []; renderShell(); };
+    document.querySelectorAll('[data-pepsite]').forEach(b => b.onclick = () => { keep(); const s = b.dataset.pepsite; e.sites = e.sites.includes(s) ? e.sites.filter(x => x !== s) : [...e.sites, s]; renderShell(); });
+    $('pepSave').onclick = async () => {
+      keep(); e.name = e.name.trim(); e.dose = e.dose.trim();
+      if (!e.name) return renderErr('Give it a name.');
+      if (!e.sites.length) return renderErr('Pick at least one injection site.');
+      const dupe = S.compounds.find(c => c.id !== e.id && normName(c.name) === normName(e.name));
+      if (dupe) return renderErr(`${dupe.name} is already in your list.`);
+      try {
+        const row = { name: e.name, dose: e.dose || null, days: e.days.slice().sort((a, b) => a - b), sites: e.sites };
+        if (e.id) { await api.updateCompound(e.id, row); Object.assign(S.compounds.find(c => c.id === e.id), row); }
+        else S.compounds.push(await api.addCompound(row));
+        P.edit = null; openOverlay('pep-setup'); toast('Saved');
+      } catch (err) { renderErr("Couldn't save. Try again."); }
+    };
+  }
+  if (S.overlay === 'pep-log') {
+    $('pepClose').onclick = closeOverlay;
+    document.querySelectorAll('[data-peppick]').forEach(b => b.onclick = () => { P.pick = b.dataset.peppick; renderShell(); });
+    $('pepLogNow') && ($('pepLogNow').onclick = async () => {
+      const c = S.compounds.find(x => x.id === P.logFor), site = P.pick || pepNext(c);
+      $('pepLogNow').disabled = true;
+      try {
+        const log = await api.logInjection(c.id, site);
+        S.injLogs.unshift(log);
+        if (navigator.vibrate) navigator.vibrate(15);
+        closeOverlay(); toast(`Logged ${site}. Next time: ${pepNext(c)}`);
+      } catch (err) { $('pepLogNow').disabled = false; toast("Couldn't log it. Try again."); }
+    });
+  }
+  if (S.overlay === 'pep-history') {
+    $('pepClose').onclick = closeOverlay;
+    document.querySelectorAll('[data-pepundo]').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this log entry?')) return;
+      try { await api.deleteInjection(b.dataset.pepundo); S.injLogs = S.injLogs.filter(l => l.id !== b.dataset.pepundo); renderShell(); } catch (e) { toast("Couldn't delete it."); }
+    });
+  }
+}
+function meInjectionCard() {
+  const on = S.settings?.peptides_enabled;
+  return `<div class="card"><div class="k">Injection tracker</div>
+    ${on ? `<div class="v txt">On · ${(S.compounds || []).length} tracked</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn btn-ghost" id="pepSetup2" style="padding:12px">Manage</button><button class="btn btn-ghost" id="pepHistory" style="padding:12px">History</button></div>
+      <button class="btn" id="pepTurnOff" style="margin-top:6px;color:var(--muted);padding:10px">Turn off tracker</button>`
+    : `<div class="v txt">Off. Track peptide or other injections and never forget which site you used last.</div>
+      <button class="btn btn-ghost" id="pepTurnOn" style="margin-top:12px">Turn on injection tracker</button>`}
+    <p class="muted" style="font-size:12px;margin-top:8px">Private to you. Your coach can't see it.</p></div>`;
+}
+
 /* ---------- Me ---------- */
 function viewMe() {
   const p = S.profile;
@@ -1624,12 +1989,13 @@ function viewMe() {
     <div class="card"><div class="k">Name</div><div class="v">${esc(p.full_name || '—')}</div></div>
     <div class="card"><div class="k">Email</div><div class="v">${esc(p.email || S.user.email)}</div></div>
     <div class="card"><div class="k">Plan</div><div class="v">${p.tier === 'transformation' ? 'Transformation Coaching' : p.tier === 'fitness' ? 'Fitness Coaching' : 'Member'}</div></div>
+    ${S.pepReady && !(Number(S.intake?.answers?.age) < 18) ? meInjectionCard() : ''}
     ${cfg.BILLING_PORTAL_URL ? `<a class="btn btn-ghost" style="margin-top:14px" href="${esc(cfg.BILLING_PORTAL_URL)}" target="_blank" rel="noopener">Manage Billing</a>
     <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">Update your card or cancel. Log in with ${esc(p.email || S.user.email)}.</p>` : ''}
     <button class="btn btn-ghost" id="out" style="margin-top:14px">Sign Out</button>`;
 }
 function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; }
-async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = S.nutIntake = S.mealPlan = null; N.loadedFor = null; N.checked = new Set(); N.view = 'plan'; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
+async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = S.nutIntake = S.mealPlan = null; N.loadedFor = null; N.checked = new Set(); N.view = 'plan'; S.settings = null; S.compounds = []; S.injLogs = []; S.overlay = null; document.body.style.overflow = ''; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
 
 /* ---------- Streak ---------- */
 function computeStreak() {
@@ -1663,6 +2029,10 @@ async function loadData() {
   S.intake = intake; S.program = program;
   [S.suppIntake, S.protocol] = await Promise.all([api.suppIntake(S.user.id).catch(() => null), api.protocol(S.user.id).catch(() => null)]);
   [S.nutIntake, S.mealPlan] = await Promise.all([api.nutIntake(S.user.id).catch(() => null), api.mealPlan(S.user.id).catch(() => null)]);
+  try {
+    const [st, cs, lg] = await Promise.all([api.settings(), api.compounds(), api.injLogs()]);
+    S.settings = st; S.compounds = cs || []; S.injLogs = lg || []; S.pepReady = true;
+  } catch (e) { S.pepReady = false; } // tracker tables not set up yet → hide the feature
   // Self-heal: if they submitted a questionnaire but nothing's published yet, nudge the server.
   // (The server skips this if a draft already exists or is in progress, so it never double-drafts.)
   if (!DEMO) {
@@ -1682,6 +2052,8 @@ async function boot() {
     if (!S.profile.active) return renderInactive();
     if (S.welcome) { S.welcome = false; history.replaceState(null, '', '/app/'); }
     await loadData();
+    const age = Number(S.intake?.answers?.age);
+    if (S.pepReady && !S.settings?.peptides_answered && !(age && age < 18)) S.overlay = 'pep-ask';
     renderShell();
   } catch (e) {
     console.error(e);
