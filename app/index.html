@@ -395,6 +395,28 @@
   .av-entry{position:relative;margin:16px 0 12px}
   .av-entry .field{font-size:34px;font-weight:800;text-align:center;padding:18px 50px}
   .av-entry span{position:absolute;right:18px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:700}
+  .ex.has-ph{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start}
+  .ex-body{min-width:0}
+  .ex-ph{width:64px;height:64px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--line);padding:0;display:grid;place-items:center;color:var(--muted);flex:0 0 auto}
+  .ex-ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ex-ph.wait{background:var(--card-2);animation:phPulse 1.2s ease-in-out infinite}
+  .ex-ph.none{background:var(--card-2);border-style:dashed;font-size:18px;font-weight:800;line-height:1;gap:0;align-content:center}
+  .ex-ph.none small{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .ex-ph.none img{display:none}
+  .ed-exhead .ex-ph{width:46px;height:46px;border-radius:10px}
+  @keyframes phPulse{50%{opacity:.5}}
+  .exm{position:fixed;inset:0;z-index:95}
+  .exm-bg{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+  .exm-card{position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);max-width:480px;margin:0 auto;max-height:88dvh;overflow:auto;background:var(--bg-2);border:1px solid var(--line);border-radius:22px;padding:20px}
+  .exm-img{position:relative;margin-top:14px;border-radius:16px;overflow:hidden;background:#fff;aspect-ratio:4/3}
+  .exm-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .35s}
+  .exm-img img.on{opacity:1}
+  .exm-step{position:absolute;left:10px;bottom:10px;font-size:10px;font-weight:800;letter-spacing:.14em;background:var(--accent);color:var(--on-accent);padding:4px 9px;border-radius:999px}
+  .exm-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;max-height:46dvh;overflow:auto}
+  .exm-opt{display:flex;flex-direction:column;gap:5px;padding:5px;border-radius:12px;background:var(--card);border:1px solid var(--line);text-align:left}
+  .exm-opt.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .exm-opt img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#fff}
+  .exm-opt span{font-size:11px;font-weight:600;line-height:1.25;color:var(--text)}
 </style>
 </head>
 <body>
@@ -1153,12 +1175,13 @@ async function submitIntake() {
 
 /* ---------- Published program (client view) ---------- */
 let openDay = 0;
-function exRow(x) {
-  return `<div class="ex">
+function exRow(x, path) {
+  const ph = path ? exThumb(x, path) : '';
+  return `<div class="ex ${ph ? 'has-ph' : ''}">${ph}<div class="ex-body">
     <div class="ex-top"><b>${esc(x.name)}</b><span class="sr">${esc(x.sets)} × ${esc(x.reps)}</span></div>
     <div class="ex-meta">${x.rest ? `<span>Rest ${esc(x.rest)}</span>` : ''}${x.rir !== undefined && x.rir !== '' ? `<span>${esc(x.rir)} RIR</span>` : ''}</div>
     ${x.notes ? `<div class="ex-note">${esc(x.notes)}</div>` : ''}
-  </div>`;
+  </div></div>`;
 }
 function viewPublished(p) {
   const d = p.data || {};
@@ -1179,7 +1202,7 @@ function viewPublished(p) {
           </button>
           ${openDay === i ? `<div class="day-body">
             ${day.warmup ? `<div class="ex-note" style="margin:0 0 10px"><b style="color:var(--text)">Warm-up:</b> ${esc(day.warmup)}</div>` : ''}
-            ${(day.exercises || []).map(exRow).join('')}
+            ${(day.exercises || []).map((x, xi) => exRow(x, `pub.${i}.${xi}`)).join('')}
           </div>` : ''}
         </div>`).join('')}
     </div>
@@ -1187,6 +1210,7 @@ function viewPublished(p) {
     ${d.cardio ? `<div class="card"><div class="k">Steps & cardio</div><div class="v txt">${esc(d.cardio)}</div></div>` : ''}`;
 }
 function bindPublished() {
+  bindExThumbs();
   document.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { const i = +b.dataset.day; openDay = openDay === i ? -1 : i; renderShell(); });
 }
 
@@ -1307,6 +1331,7 @@ function editorHtml(d) {
         ${(day.exercises || []).map((x, xi) => `
           <div class="ed-ex">
             <div class="ed-exhead">
+              ${exThumb(x, `ed.${di}.${xi}`, true)}
               ${f(`days.${di}.exercises.${xi}.name`, x.name, 'Exercise', 'strong')}
               <div class="ed-btns"><button data-mv="${di}.${xi}.-1" aria-label="Move up">↑</button><button data-mv="${di}.${xi}.1" aria-label="Move down">↓</button><button data-delex="${di}.${xi}" aria-label="Remove" class="x">✕</button></div>
             </div>
@@ -1391,6 +1416,9 @@ function bindCoach() {
   if (!C.edit) return;
 
   document.querySelectorAll('[data-path]').forEach(el => el.oninput = () => setPath(C.edit, el.dataset.path, el.value));
+  // Renaming an exercise re-matches its photo (unless you turned the photo off)
+  document.querySelectorAll('[data-path$=".name"]').forEach(el => { const m = el.dataset.path.match(/^days\.(\d+)\.exercises\.(\d+)\.name$/); if (m) el.onchange = () => { const x = C.edit.days[+m[1]].exercises[+m[2]]; if (x.img !== 'none') x.img = ''; hydrateExThumbs(); }; });
+  bindExThumbs();
   const re = () => renderShell();
   document.querySelectorAll('[data-addex]').forEach(b => b.onclick = () => { C.edit.days[+b.dataset.addex].exercises.push(blankEx()); re(); });
   document.querySelectorAll('[data-delex]').forEach(b => b.onclick = () => { const [d, x] = b.dataset.delex.split('.').map(Number); C.edit.days[d].exercises.splice(x, 1); re(); });
@@ -2217,6 +2245,169 @@ function meInjectionCard() {
     : `<div class="v txt">Off. Track peptide or other injections and never forget which site you used last.</div>
       <button class="btn btn-ghost" id="pepTurnOn" style="margin-top:12px">Turn on injection tracker</button>`}
     <p class="muted" style="font-size:12px;margin-top:8px">Private to you. Your coach can't see it.</p></div>`;
+}
+
+/* ==========================================================
+   EXERCISE PHOTOS (free public-domain exercise library, 800+ moves)
+   ========================================================== */
+const EXLIB_JSON = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
+const EXLIB_IMG = ['https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/', 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises/'];
+const EXLIB_KEY = 'wt-exlib-v1';
+const X = { lib: null, byId: {}, loading: null, failed: false };
+const EX_SYN = [
+  [/\bdbs?\b|dumbbells?/g, 'dumbbell'], [/\bbbs?\b|barbells?/g, 'barbell'], [/\bkbs?\b|kettlebells?/g, 'kettlebell'], [/\bez[\s-]?bar\b/g, 'ez bar'],
+  [/\brdls?\b/g, 'romanian deadlift'], [/\bohp\b/g, 'overhead press'], [/\bsldls?\b/g, 'stiff legged deadlift'], [/\bstiff[\s-]leg(ged)?\b/g, 'stiff legged'],
+  [/pull[\s-]?downs?/g, 'pulldown'], [/pull[\s-]?ups?/g, 'pullup'], [/chin[\s-]?ups?/g, 'chinup'], [/push[\s-]?ups?/g, 'pushup'], [/sit[\s-]?ups?/g, 'situp'],
+  [/push[\s-]?downs?/g, 'pushdown'], [/step[\s-]?ups?/g, 'stepup'], [/t[\s-]bar/g, 'tbar'], [/\bskull[\s-]?crushers?/g, 'skullcrusher'],
+  [/\bextensions?\b|\bext\b/g, 'extension'], [/\braises\b/g, 'raise'], [/\bcurls\b/g, 'curl'], [/\brows\b/g, 'row'], [/\bpresses\b/g, 'press'],
+  [/\bflyes\b|\bflys\b|\bflies\b/g, 'fly'], [/\bsquats\b/g, 'squat'], [/\blunges\b/g, 'lunge'], [/\bthrusts\b/g, 'thrust'], [/\bdips\b/g, 'dip'],
+  [/\bcrunches\b/g, 'crunch'], [/\bshrugs\b/g, 'shrug'], [/\bdeadlifts\b/g, 'deadlift'], [/\bcables\b/g, 'cable'], [/\bmachines\b/g, 'machine'],
+  [/\bsmith machine\b/g, 'smith'], [/\blat\b|\blats\b/g, 'lat'], [/\bdelts?\b|\bdeltoids?\b/g, 'delt'], [/\bglutes?\b/g, 'glute'], [/\bcalves\b/g, 'calf'],
+  [/\bseated\b|\bsitting\b/g, 'seated'], [/\bone[\s-]arm\b|\bsingle[\s-]arm\b|\bunilateral\b/g, 'onearm'], [/\bone[\s-]leg\b|\bsingle[\s-]leg\b/g, 'oneleg'],
+  [/\bbulgarian split squat\b/g, 'split squat bulgarian'], [/\bpec[\s-]?deck\b|\bmachine fly\b/g, 'butterfly'], [/\brear delt fly\b|\brear delt\b/g, 'reverse fly'],
+  [/\bcable fly\b|\bcable crossovers?\b/g, 'cable crossover'], [/\babduction\b|\babductors?\b/g, 'abductor'], [/\badduction\b|\badductors?\b/g, 'adductor'], [/\bswings\b/g, 'swing'], [/\bovershoulder\b/g, 'overhead'], [/\bmilitary press\b/g, 'shoulder press'],
+];
+const EX_STOP = new Set(['with', 'the', 'a', 'an', 'on', 'and', 'of', 'to', 'in', 'or', 'your', 'grip', 'medium', 'exercise', 'variation', 'version', 'bar', 'attachment', 'handle']);
+const EX_EQUIP = new Set(['barbell', 'dumbbell', 'cable', 'machine', 'smith', 'kettlebell', 'band', 'bands', 'ez', 'tbar', 'bodyweight']);
+const EX_SOFT = new Set(['seated', 'standing', 'incline', 'decline', 'flat', 'onearm', 'oneleg', 'alternating', 'alternate', 'wide', 'close', 'narrow', 'reverse', 'neutral', 'lying', 'bent', 'over', 'two', 'arm', 'leg', 'kneeling']);
+// Common gym names → the library's exact name
+const EX_ALIAS = {
+  'bench press': 'Barbell Bench Press - Medium Grip', 'barbell bench press': 'Barbell Bench Press - Medium Grip', 'flat bench press': 'Barbell Bench Press - Medium Grip',
+  'incline bench press': 'Barbell Incline Bench Press - Medium Grip', 'incline barbell bench press': 'Barbell Incline Bench Press - Medium Grip',
+  'squat': 'Barbell Full Squat', 'back squat': 'Barbell Full Squat', 'barbell back squat': 'Barbell Full Squat', 'barbell squat': 'Barbell Squat',
+  'deadlift': 'Barbell Deadlift', 'conventional deadlift': 'Barbell Deadlift', 'hip thrust': 'Barbell Hip Thrust', 'barbell hip thrust': 'Barbell Hip Thrust',
+  'overhead press': 'Barbell Shoulder Press', 'barbell overhead press': 'Barbell Shoulder Press', 'standing overhead press': 'Standing Military Press',
+  'barbell row': 'Bent Over Barbell Row', 'bent over row': 'Bent Over Barbell Row', 'pendlay row': 'Bent Over Barbell Row',
+  'lat pulldown': 'Wide-Grip Lat Pulldown', 'wide grip lat pulldown': 'Wide-Grip Lat Pulldown', 'pullup': 'Pullups', 'chinup': 'Chin-Up',
+  'leg extension': 'Leg Extensions', 'leg curl': 'Lying Leg Curls', 'lying leg curl': 'Lying Leg Curls', 'hamstring curl': 'Lying Leg Curls',
+  'calf raise': 'Standing Calf Raises', 'standing calf raise': 'Standing Calf Raises', 'pushup': 'Pushups', 'dip': 'Dips - Triceps Version',
+  'tricep pushdown': 'Triceps Pushdown', 'triceps pushdown': 'Triceps Pushdown', 'rope pushdown': 'Triceps Pushdown - Rope Attachment',
+  'seated cable row': 'Seated Cable Rows', 'cable row': 'Seated Cable Rows', 'face pull': 'Face Pull', 'plank': 'Plank', 'glute bridge': 'Barbell Glute Bridge',
+};
+
+const exNorm = s => {
+  let t = String(s || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[–—]/g, '-');
+  EX_SYN.forEach(([re, to]) => { t = t.replace(re, to); });
+  return t.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+};
+const exToks = s => exNorm(s).split(' ').filter(w => w && !EX_STOP.has(w)).map(w => w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+const exW = w => EX_EQUIP.has(w) ? 1.4 : EX_SOFT.has(w) ? .55 : 1;
+function exScore(qt, item) {
+  const ct = item._t, cs = new Set(ct), qs = new Set(qt);
+  let inter = 0, wq = 0, wc = 0;
+  qs.forEach(w => { wq += exW(w); if (cs.has(w)) inter += exW(w); });
+  cs.forEach(w => { wc += exW(w); });
+  let sc = 2 * inter / (wq + wc || 1);
+  const core = [...qs].filter(w => !EX_EQUIP.has(w) && !EX_SOFT.has(w));
+  if (core.length && !core.some(w => cs.has(w))) return 0;   // must share the actual movement (curl, row, squat…)
+  const qe = qt.filter(w => EX_EQUIP.has(w)), ce = ct.filter(w => EX_EQUIP.has(w));
+  if (qe.length && ce.length && !qe.some(w => ce.includes(w))) sc *= .55;   // asked for a dumbbell move, this is a barbell one
+  if (qe.length && !ce.length && item.e && !qe.some(w => String(item.e).includes(w))) sc *= .8;
+  return sc;
+}
+function exMatch(name) {
+  if (!X.lib || !name) return null;
+  const n = exNorm(name), alias = EX_ALIAS[n];
+  if (alias) { const hit = X.lib.find(i => i.n === alias); if (hit) return hit; }
+  const exact = X.lib.find(i => exNorm(i.n) === n); if (exact) return exact;
+  const qt = exToks(name); if (!qt.length) return null;
+  let best = null, bs = 0;
+  for (const it of X.lib) { const s = exScore(qt, it); if (s > bs || (s === bs && best && it.n.length < best.n.length)) { bs = s; best = it; } }
+  return bs >= .55 ? best : null;
+}
+function exSearch(q, n = 24) {
+  if (!X.lib) return [];
+  const qt = exToks(q); if (!qt.length) return X.lib.slice(0, n);
+  return X.lib.map(it => [exScore(qt, it) + (it.n.toLowerCase().includes(q.toLowerCase().trim()) ? .5 : 0), it]).filter(([s]) => s > .15).sort((a, b) => b[0] - a[0]).slice(0, n).map(([, it]) => it);
+}
+// x.img: '' or missing = auto-match from the name, 'none' = no photo, anything else = a library id the coach picked
+function exFor(x) {
+  if (!X.lib || x.img === 'none') return null;
+  if (x.img && X.byId[x.img]) return X.byId[x.img];
+  return exMatch(x.name);
+}
+const exSrc = (path, k = 0) => EXLIB_IMG[k] + path;
+function exIndex(list) {
+  X.lib = list.map(i => ({ ...i, _t: exToks(i.n) }));
+  X.byId = {}; X.lib.forEach(i => { X.byId[i.id] = i; });
+}
+function loadExLib() {
+  if (X.lib || X.loading || X.failed) return X.loading;
+  try { const c = JSON.parse(localStorage.getItem(EXLIB_KEY) || 'null'); if (c && c.length > 100) { exIndex(c); return null; } } catch (e) {}
+  X.loading = fetch(EXLIB_JSON).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(all => {
+    const slim = all.filter(e => e.images && e.images.length).map(e => ({ id: e.id, n: e.name, e: e.equipment || '', m: (e.primaryMuscles || []).join(', '), i: e.images.slice(0, 2) }));
+    try { localStorage.setItem(EXLIB_KEY, JSON.stringify(slim)); } catch (e) {}
+    exIndex(slim); X.loading = null; hydrateExThumbs();
+  }).catch(() => { X.failed = true; X.loading = null; setTimeout(() => { X.failed = false; }, 60000); hydrateExThumbs(); });
+  return X.loading;
+}
+const PH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>';
+function exThumb(x, path, coach = false) {
+  const it = exFor(x);
+  if (!X.lib) return `<button class="ex-ph wait" data-exthumb="${path}" data-coach="${coach ? 1 : ''}" aria-label="Exercise photo">${PH_ICON}</button>`;
+  if (!it) return coach ? `<button class="ex-ph none" data-exthumb="${path}" data-coach="1" aria-label="Pick a photo">+<small>photo</small></button>` : '';
+  return `<button class="ex-ph" data-exthumb="${path}" data-coach="${coach ? 1 : ''}" aria-label="See ${esc(it.n)}"><img loading="lazy" alt="" src="${exSrc(it.i[0])}" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${EXLIB_IMG[1]}${it.i[0]}'}else{this.closest('.ex-ph').classList.add('none')}"/></button>`;
+}
+function exAt(path) {   // path like "pub.0.3" or "ed.0.3"
+  const [src, d, x] = path.split('.'), data = src === 'ed' ? C.edit : (S.program?.data || {});
+  return data?.days?.[+d]?.exercises?.[+x];
+}
+function hydrateExThumbs() {
+  document.querySelectorAll('[data-exthumb]').forEach(el => {
+    const x = exAt(el.dataset.exthumb); if (!x) return;
+    const tmp = document.createElement('div'); tmp.innerHTML = exThumb(x, el.dataset.exthumb, !!el.dataset.coach);
+    const n = tmp.firstElementChild; if (n) el.replaceWith(n); else el.remove();
+  });
+  bindExThumbs();
+}
+function bindExThumbs() {
+  document.querySelectorAll('[data-exthumb]').forEach(el => el.onclick = e => {
+    e.stopPropagation();
+    const x = exAt(el.dataset.exthumb); if (!x) return;
+    if (el.dataset.coach) return openExPicker(el.dataset.exthumb);
+    const it = exFor(x); if (it) openExViewer(it, x.name);
+  });
+  if (!X.lib && document.querySelector('[data-exthumb]')) loadExLib();
+}
+function exModal(html) {
+  const el = document.createElement('div'); el.className = 'exm';
+  el.innerHTML = `<div class="exm-bg"></div><div class="exm-card">${html}</div>`;
+  document.body.appendChild(el); document.body.style.overflow = 'hidden';
+  const close = () => { clearInterval(el._t); el.remove(); document.body.style.overflow = S.overlay ? 'hidden' : ''; };
+  el.querySelector('.exm-bg').onclick = close; el.querySelectorAll('[data-exclose]').forEach(b => b.onclick = close);
+  return { el, close };
+}
+function openExViewer(it, name) {
+  const { el } = exModal(`
+    <div class="ov-top"><div class="display" style="font-size:24px;line-height:1.05">${esc(name || it.n)}</div><button class="link" data-exclose>Close</button></div>
+    <div class="exm-img">${it.i.map((p, k) => `<img src="${exSrc(p)}" alt="${k ? 'Finish' : 'Start'} position" class="${k ? '' : 'on'}" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${EXLIB_IMG[1]}${p}'}"/>`).join('')}
+      ${it.i.length > 1 ? '<span class="exm-step">START</span>' : ''}</div>
+    <div class="ex-meta" style="margin-top:12px;flex-wrap:wrap">${it.e ? `<span>Equipment: ${esc(it.e)}</span>` : ''}${it.m ? `<span>Works: ${esc(it.m)}</span>` : ''}</div>
+    <p class="muted" style="font-size:12px;margin-top:10px">Look for this setup in your gym. Your gym's version may look a little different.</p>`);
+  const imgs = el.querySelectorAll('.exm-img img'), lab = el.querySelector('.exm-step');
+  if (imgs.length > 1) { let k = 0; el._t = setInterval(() => { imgs[k].classList.remove('on'); k = 1 - k; imgs[k].classList.add('on'); lab.textContent = k ? 'FINISH' : 'START'; }, 1100); }
+}
+function openExPicker(path) {
+  const x = exAt(path); if (!x) return;
+  if (!X.lib) { toast('Loading exercise photos… try again in a second.'); loadExLib(); return; }
+  const cur = exFor(x);
+  const { el, close } = exModal(`
+    <div class="ov-top"><div class="display" style="font-size:24px">Pick a <span class="accent">photo</span></div><button class="link" data-exclose>Close</button></div>
+    <p class="muted" style="font-size:13px;margin:4px 0 10px">For <b style="color:var(--text)">${esc(x.name || 'this exercise')}</b>${x.img && x.img !== 'none' ? ' · you picked this one' : cur ? ' · auto-matched' : ''}</p>
+    <input class="field" id="exQ" placeholder="Search e.g. leg press, cable row" value="${esc(x.name || '')}" />
+    <div class="exm-grid" id="exGrid"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost" id="exAuto" style="padding:11px;font-size:14px">Auto-match</button>
+      <button class="btn btn-ghost" id="exNone" style="padding:11px;font-size:14px">No photo</button></div>`);
+  const grid = el.querySelector('#exGrid'), q = el.querySelector('#exQ');
+  const done = v => { x.img = v; close(); renderShell(); toast('Photo updated. Save the draft to keep it.'); };
+  const draw = () => {
+    grid.innerHTML = exSearch(q.value).map(it => `<button class="exm-opt ${cur && cur.id === it.id ? 'on' : ''}" data-pick="${esc(it.id)}"><img loading="lazy" src="${exSrc(it.i[0])}" alt="" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${EXLIB_IMG[1]}${it.i[0]}'}"/><span>${esc(it.n)}</span></button>`).join('') || '<p class="muted" style="grid-column:1/-1;text-align:center">No matches. Try another word.</p>';
+    grid.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => done(b.dataset.pick));
+  };
+  q.oninput = draw; draw();
+  el.querySelector('#exAuto').onclick = () => done('');
+  el.querySelector('#exNone').onclick = () => done('none');
 }
 
 /* ==========================================================
