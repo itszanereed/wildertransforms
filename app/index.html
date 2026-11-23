@@ -355,6 +355,16 @@
   .br-desc{color:var(--muted);font-size:15px;line-height:1.5;margin:10px 0 24px;animation:pop .45s ease-out .45s both}
   .br-card .btn{animation:pop .45s ease-out .55s both}
   @media (prefers-reduced-motion:reduce){.cele *,.cele{animation:none!important}}
+
+  /* ---- Meal swap ---- */
+  .swap-btn{margin-top:8px;font-size:13px;font-weight:700;color:var(--accent);padding:6px 0}
+  .swapbox{margin-top:10px;padding:12px;border-radius:12px;border:1px solid rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.06)}
+  .swap-actions{display:grid;grid-template-columns:1fr 1.6fr;gap:8px;margin-top:10px}
+  .swap-actions .btn{padding:12px;font-size:14px}
+  .spin.sm{width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:-3px;margin-right:6px;border-top-color:var(--on-accent)}
+  .dislikes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .dislikes span{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:6px 6px 6px 12px;border-radius:999px;background:var(--card-2);border:1px solid var(--line)}
+  .dislikes button{width:20px;height:20px;border-radius:50%;color:var(--muted);font-size:11px}
   .center{min-height:70dvh;display:grid;place-items:center;text-align:center}
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -468,6 +478,13 @@ function makeSupabaseApi() {
     async coachMealPlans() { return must(await sb.from('meal_plans').select('id,user_id,status,data,ai_notes,error,published_at').neq('status', 'archived').order('created_at', { ascending: false })); },
     async generateMealPlan(user_id, instructions) { return this.callMealPlan({ user_id, instructions }); },
     async coachSaveMealPlan(id, data) { must(await sb.from('meal_plans').update({ data, updated_at: new Date().toISOString() }).eq('id', id)); },
+    async swapMeal(user_id, plan, ti, mi, notes) {
+      const { data } = await sb.auth.getSession();
+      const res = await fetch('/api/swap-meal', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (data.session?.access_token || '') }, body: JSON.stringify({ user_id, plan, ti, mi, notes }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Swap failed. Try again.');
+      return out;
+    },
     async coachResetNutrition(user_id) {
       must(await sb.from('meal_plans').update({ status: 'archived' }).eq('user_id', user_id).in('status', ['flagged', 'failed', 'draft', 'generating']));
       must(await sb.from('nutrition_intakes').delete().eq('user_id', user_id));
@@ -640,6 +657,13 @@ function makeDemoApi() {
       return { ok: true };
     },
     async coachSaveMealPlan(id, data) { mealPlans.find(p => p.id === id).data = data; },
+    async swapMeal(user_id, plan, ti, mi, notes) {
+      await wait(); await wait();
+      const old = plan.day_templates[ti].meals[mi];
+      const meal = { slot: old.slot, title: 'Turkey taco bowl', photo_query: 'turkey taco bowl', ingredients: ['6 oz lean ground turkey', '1 cup cooked rice', '1/2 cup black beans', 'salsa, lettuce'], instructions: 'Brown turkey with taco seasoning, serve over rice with beans and salsa.', calories: old.calories, protein_g: old.protein_g, carbs_g: old.carbs_g, fat_g: old.fat_g };
+      const list = structuredClone(plan.shopping_list); const meat = list.find(sc => sc.section === 'Meat & Seafood'); if (meat) meat.items = meat.items.filter(i => !/salmon/i.test(i.name)).concat([{ name: 'Lean ground turkey', qty: '1.5 lb' }]);
+      return { meal, shopping_list: list };
+    },
     async coachResetNutrition(user_id) { mealPlans.forEach(p => { if (p.user_id === user_id && p.status !== 'published') p.status = 'archived'; }); for (let i = nutIntakes.length - 1; i >= 0; i--) if (nutIntakes[i].user_id === user_id) nutIntakes.splice(i, 1); },
     async mealPhotos(items) { await wait(); return items.map((x, k) => ({ url: `https://images.pexels.com/demo/${k + (x.page || 1)}.jpg`, thumb: `https://images.pexels.com/demo/${k + (x.page || 1)}.jpg`, credit: 'Demo Photographer', link: 'https://www.pexels.com', query: x.query, page: x.page || 1 })); },
     async coachCreateMealPlanDraft(user_id, data) { mealPlans.unshift({ id: 'm' + (++n), user_id, status: 'draft', data: structuredClone(data) }); },
@@ -1124,7 +1148,7 @@ function bindPublished() {
 /* ==========================================================
    COACH TAB: review AI drafts, edit, regenerate, publish
    ========================================================== */
-const C = { clients: [], programs: {}, intakes: {}, protocols: {}, suppIntakes: {}, mealPlans: {}, nutIntakes: {}, sel: null, edit: null, sedit: null, nedit: null, poll: null, loaded: false };
+const C = { clients: [], programs: {}, intakes: {}, protocols: {}, suppIntakes: {}, mealPlans: {}, nutIntakes: {}, sel: null, edit: null, sedit: null, nedit: null, poll: null, loaded: false, swapOpen: null };
 
 function clientStatus(c) {
   const ps = C.programs[c.id] || [];
@@ -1309,7 +1333,7 @@ function bindCoach() {
     });
     return;
   }
-  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; C.sedit = null; C.nedit = null; renderShell(); };
+  $('cBack').onclick = () => { stopPoll(); C.sel = null; C.edit = null; C.sedit = null; C.nedit = null; C.swapOpen = null; renderShell(); };
   bindCoachSupps(); bindCoachNutrition();
   $('cGen') && ($('cGen').onclick = () => generate(''));
   $('cEditPub') && ($('cEditPub').onclick = async () => {
@@ -1759,6 +1783,8 @@ function nutEditorHtml(d, notes) {
   const ids = (d.day_templates || []).map(x => x.id);
   return `
     ${notes ? `<div class="notice"><b>Notes for you</b> (the client never sees these)<br>${esc(notes).replace(/\n/g, '<br>')}</div>` : ''}
+    ${(d.dislikes || []).length ? `<div class="card ed"><div class="k">Doesn't like</div><div class="dislikes">${d.dislikes.map((x, i) => `<span>${esc(x)}<button data-nundis="${i}" aria-label="Remove">✕</button></span>`).join('')}</div>
+      <p class="muted" style="font-size:12px;margin-top:8px">Future meal plans and swaps avoid these.</p></div>` : ''}
     ${(d.day_templates || []).some(tp => (tp.meals || []).some(m => !m.photo)) ? `<button class="btn btn-ghost" id="nPhotos" style="margin-bottom:12px">📸 Add photos to meals without one</button>` : ''}
     <div class="card ed">
       <label>Summary (client sees this)</label>${t('summary', d.summary)}
@@ -1784,6 +1810,11 @@ function nutEditorHtml(d, notes) {
             </div>
             <div class="ed-exhead">${f(`day_templates.${ti}.meals.${mi}.slot`, m.slot, 'Slot')}${f(`day_templates.${ti}.meals.${mi}.title`, m.title, 'Meal', 'strong')}
               <div class="ed-btns"><button class="x" data-ndelmeal="${ti}.${mi}" aria-label="Remove">✕</button></div></div>
+            ${C.swapOpen === `${ti}.${mi}` ? `<div class="swapbox">
+                <label style="margin-top:0">Why don't they like it?</label>
+                <textarea class="field" id="swapNotes" rows="2" placeholder="e.g. hates salmon, wants something she can eat cold at work"></textarea>
+                <div class="swap-actions"><button class="btn btn-ghost" id="swapCancel">Cancel</button><button class="btn btn-primary" id="swapGo">Get a new meal</button></div>
+              </div>` : `<button class="swap-btn" data-nswap="${ti}.${mi}">↻ Swap meal</button>`}
             <label>Ingredients (one per line)</label>
             <textarea class="field" data-nlines="day_templates.${ti}.meals.${mi}.ingredients" rows="4">${esc((m.ingredients || []).join('\n'))}</textarea>
             <label>Instructions</label>${t(`day_templates.${ti}.meals.${mi}.instructions`, m.instructions, 2)}
@@ -1848,6 +1879,24 @@ function bindCoachNutrition() {
   }; });
   document.querySelectorAll('[data-ndelmeal]').forEach(b => b.onclick = () => { const [t, m] = b.dataset.ndelmeal.split('.').map(Number); C.nedit.day_templates[t].meals.splice(m, 1); recalcTotals(C.nedit); renderShell(); });
   document.querySelectorAll('[data-naddmeal]').forEach(b => b.onclick = () => { C.nedit.day_templates[+b.dataset.naddmeal].meals.push({ slot: 'Snack', title: '', ingredients: [], instructions: '', calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }); renderShell(); });
+  document.querySelectorAll('[data-nswap]').forEach(b => b.onclick = () => { C.swapOpen = b.dataset.nswap; renderShell(); setTimeout(() => document.getElementById('swapNotes')?.focus(), 50); });
+  $('swapCancel') && ($('swapCancel').onclick = () => { C.swapOpen = null; renderShell(); });
+  document.querySelectorAll('[data-nundis]').forEach(b => b.onclick = () => { C.nedit.dislikes.splice(+b.dataset.nundis, 1); renderShell(); });
+  $('swapGo') && ($('swapGo').onclick = async () => {
+    const notes = $('swapNotes').value.trim(); if (!notes) return toast("Add a quick note about why they don't like it");
+    const [ti, mi] = C.swapOpen.split('.').map(Number), old = C.nedit.day_templates[ti].meals[mi];
+    const btn = $('swapGo'); btn.disabled = true; btn.innerHTML = '<span class="spin sm"></span> Cooking up something new…'; $('swapCancel').disabled = true;
+    try {
+      const out = await api.swapMeal(C.sel, C.nedit, ti, mi, notes);
+      C.nedit.day_templates[ti].meals[mi] = out.meal;
+      C.nedit.shopping_list = out.shopping_list;
+      C.nedit.dislikes = [...new Set([...(C.nedit.dislikes || []), notes])].slice(-40);
+      recalcTotals(C.nedit); C.swapOpen = null;
+      const row = (C.mealPlans[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
+      if (row) api.coachSaveMealPlan(row.id, C.nedit).catch(() => {});
+      renderShell(); toast(`Swapped "${old.title}" for "${out.meal.title}". Shopping list updated.`);
+    } catch (e) { btn.disabled = false; btn.textContent = 'Get a new meal'; $('swapCancel').disabled = false; toast(e.message || 'Swap failed. Try again.'); }
+  });
   document.querySelectorAll('[data-nphoto]').forEach(b => b.onclick = async () => {
     const [ti, mi] = b.dataset.nphoto.split('.').map(Number), m = C.nedit.day_templates[ti].meals[mi];
     const query = (m.photo_query || m.title || '').trim(); if (!query) return toast('Type a photo search first');
