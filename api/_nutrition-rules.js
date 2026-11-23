@@ -42,6 +42,13 @@ SHOPPING LIST
 - Group by store section: Produce, Meat & Seafood, Dairy & Eggs, Grains & Bread, Pantry, Frozen, Other.
 - Use package sizes people actually buy when it makes sense ("1 dozen eggs", "2 lb bag of rice").
 
+EVERYDAY STRUGGLES (from "What do you struggle with most")
+- Eating enough / low appetite: calorie-dense foods (nut butters, olive oil, whole milk, granola, dried fruit), smoothies or shakes, smaller portions more often, liquids count.
+- Cravings / overeating: high-volume, high-fiber, high-protein meals that keep them full; plan a daily treat so nothing feels off-limits.
+- Staying consistent: the simplest possible meals, lots of repeats, grab-and-go options.
+- Late-night eating: a planned evening snack, a bigger protein-rich dinner.
+- Skipping meals: quick, portable breakfasts and lunches they can make ahead.
+
 DIET AND SAFETY
 - Never include foods the client is allergic to or said they won't eat. Follow their diet type strictly.
 - No crash diets, fasting protocols, detoxes, or "cleanses".
