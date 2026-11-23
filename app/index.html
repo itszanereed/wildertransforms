@@ -370,6 +370,31 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 14px);transform:translate(-50%,-140%);max-width:calc(100vw - 32px);z-index:60;background:var(--card-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s}
   .toast.show{transform:translate(-50%,0)}
+  .av-card{display:grid;grid-template-columns:116px 1fr;gap:14px;align-items:center;position:relative;overflow:hidden}
+  .av-card::before{content:'';position:absolute;left:-40px;top:-30px;width:200px;height:220px;background:radial-gradient(circle,rgba(var(--accent-rgb),.16),transparent 62%);pointer-events:none}
+  .av-fig{position:relative;display:block;width:116px;height:170px;padding:0 0 12px;background:none;border:0}
+  .av-fig svg{width:100%;height:100%;overflow:visible;transition:filter .6s}
+  .av-tag{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--muted);background:var(--card-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+  .av-tag.now{color:var(--accent);border-color:rgba(var(--accent-rgb),.4)}
+  .av-info{position:relative;min-width:0}
+  .av-pct{display:flex;align-items:baseline;gap:6px;margin-top:8px}
+  .av-pct b{font-size:40px;font-weight:400;background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .av-pct small{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+  .av-w{font-size:16px;font-weight:700;margin-top:2px}
+  .av-d{font-size:13px;color:var(--muted);margin-top:2px}
+  .av-info .spark{display:block;margin-top:8px}
+  .av-log{padding:11px;font-size:14px;margin-top:10px}
+  .av-cta{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center}
+  .av-mini,.av-prev{display:flex;align-items:center;justify-content:center;gap:2px}
+  .av-mini svg{width:48px;height:80px;overflow:visible}
+  .av-mini span,.av-prev span{color:var(--muted);font-weight:800}
+  .av-prev{margin:12px 0 2px}
+  .av-prev svg{width:84px;height:124px;overflow:visible}
+  .seg.seg3{grid-template-columns:1fr 1fr 1fr}
+  .seg.seg3 button{font-size:13px;padding:10px 4px}
+  .av-entry{position:relative;margin:16px 0 12px}
+  .av-entry .field{font-size:34px;font-weight:800;text-align:center;padding:18px 50px}
+  .av-entry span{position:absolute;right:18px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:700}
 </style>
 </head>
 <body>
@@ -482,7 +507,7 @@ function makeSupabaseApi() {
       const { data } = await sb.auth.getSession();
       const res = await fetch('/api/swap-meal', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (data.session?.access_token || '') }, body: JSON.stringify({ user_id, plan, ti, mi, notes }) });
       const out = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(out.error || 'Swap failed. Try again.');
+      if (!res.ok) throw new Error(out.error || (res.status === 404 ? 'Swap failed: swap-meal.js is missing from the api folder (404).' : res.status === 504 ? 'Swap failed: it took too long (504). Try again.' : `Swap failed (error ${res.status}).`));
       return out;
     },
     async coachResetNutrition(user_id) {
@@ -504,12 +529,26 @@ function makeSupabaseApi() {
     async settings() { return must(await sb.from('user_settings').select('*').maybeSingle()); },
     async saveSettings(st) {
       const { data: ses } = await sb.auth.getSession();
-      const row = { user_id: ses.session.user.id, peptides_answered: !!st.peptides_answered, peptides_enabled: !!st.peptides_enabled, peptide_terms_at: st.peptide_terms_at || null, updated_at: new Date().toISOString() };
-      const withTheme = { ...row, theme: st.theme || null, theme_bg: st.theme_bg || null };
-      const r = await sb.from('user_settings').upsert(withTheme, { onConflict: 'user_id' });
-      if (r.error && /theme/i.test(r.error.message || '')) must(await sb.from('user_settings').upsert(row, { onConflict: 'user_id' })); // theme columns not added yet
-      else must(r);
+      const base = { user_id: ses.session.user.id, peptides_answered: !!st.peptides_answered, peptides_enabled: !!st.peptides_enabled, peptide_terms_at: st.peptide_terms_at || null, updated_at: new Date().toISOString() };
+      const theme = { theme: st.theme || null, theme_bg: st.theme_bg || null };
+      const av = { avatar_goal: st.avatar_goal || null, avatar_sex: st.avatar_sex || null, start_weight: st.start_weight ?? null, goal_weight: st.goal_weight ?? null, avatar_started_at: st.avatar_started_at || null, avatar_off: !!st.avatar_off };
+      const tries = [{ ...base, ...theme, ...av }, { ...base, ...theme }, base];   // older databases may not have every column yet
+      let err;
+      for (let i = 0; i < tries.length; i++) {
+        const r = await sb.from('user_settings').upsert(tries[i], { onConflict: 'user_id' });
+        if (!r.error) return { avatarMissing: i > 0 };
+        err = r.error; if (!/column|schema cache/i.test(err.message || '')) break;
+      }
+      throw err;
     },
+    // ---- Weigh-ins ----
+    async weights(uid) { return must(await sb.from('weight_logs').select('id,weight_lb,log_date').eq('user_id', uid).order('log_date', { ascending: false }).limit(400)); },
+    async logWeight(weight_lb, log_date) {
+      const { data: ses } = await sb.auth.getSession();
+      return must(await sb.from('weight_logs').upsert({ user_id: ses.session.user.id, weight_lb, log_date }, { onConflict: 'user_id,log_date' }).select('id,weight_lb,log_date').single());
+    },
+    async deleteWeight(id) { must(await sb.from('weight_logs').delete().eq('id', id)); },
+    async coachWeights() { return must(await sb.from('weight_logs').select('user_id,weight_lb,log_date').order('log_date', { ascending: false }).limit(3000)); },
     async compounds() { return must(await sb.from('peptide_compounds').select('id,name,dose,days,sites').eq('archived', false).order('created_at')); },
     async addCompound(row) { return must(await sb.from('peptide_compounds').insert(row).select('id,name,dose,days,sites').single()); },
     async updateCompound(id, row) { must(await sb.from('peptide_compounds').update(row).eq('id', id)); },
@@ -541,7 +580,7 @@ function makeDemoApi() {
   const suppIntakes = [{ user_id: 'sarah', answers: { budget: '$50–100 / month', goals: ['Recovery', 'Sleep'], current: 'none', medications: 'none', conditions: 'none', allergies_diet: 'none', caffeine: 'I handle caffeine fine', pregnant: 'No' } }];
   const protocols = [];
   const nutIntakes = [], mealPlans = [], shopProg = {};
-  let demoSettings = null; const demoComps = [], demoLogs = [], demoBadges = [];
+  let demoSettings = null; const demoComps = [], demoLogs = [], demoBadges = [], demoWeights = [];
   const M = (slot, title, ing, ins, c, p, cb, f) => ({ slot, title, ingredients: ing, instructions: ins, calories: c, protein_g: p, carbs_g: cb, fat_g: f });
   const DEMO_MEALPLAN = { summary: 'Simple, high-protein meals you can prep twice a week. Rice bowls on training days, a little lighter on rest days.', gentle: false,
     targets: { calories: 2675, protein_g: 160, carbs_g: 330, fat_g: 80 },
@@ -670,7 +709,11 @@ function makeDemoApi() {
     async badges() { return demoBadges.slice(); },
     async awardBadge(badge_id) { if (!demoBadges.find(b => b.badge_id === badge_id)) demoBadges.push({ badge_id, earned_at: new Date().toISOString() }); },
     async settings() { return demoSettings; },
-    async saveSettings(st) { demoSettings = { ...st }; },
+    async saveSettings(st) { demoSettings = { ...st }; return {}; },
+    async weights() { return demoWeights.slice(); },
+    async logWeight(weight_lb, log_date) { const i = demoWeights.findIndex(w => w.log_date === log_date); const row = { id: 'w' + (++n), weight_lb, log_date }; if (i > -1) demoWeights.splice(i, 1); demoWeights.unshift(row); return row; },
+    async deleteWeight(id) { const i = demoWeights.findIndex(w => w.id === id); if (i > -1) demoWeights.splice(i, 1); },
+    async coachWeights() { return [...demoWeights.map(w => ({ ...w, user_id: 'demo' })), ...[0, 7, 14, 21, 28].map((d, k) => ({ user_id: 'sarah', weight_lb: 152 - k * 0.8, log_date: addDays(TODAY(), d - 28) }))]; },
     async compounds() { return demoComps.slice(); },
     async addCompound(row) { const c = { id: 'c' + (++n), ...row }; demoComps.push(c); return c; },
     async updateCompound(id, row) { Object.assign(demoComps.find(c => c.id === id), row); },
@@ -755,7 +798,7 @@ function bindAppearance() {
 /* ==========================================================
    STATE + RENDERING
    ========================================================== */
-const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null, nutIntake: null, mealPlan: null, settings: null, compounds: [], injLogs: [], overlay: null, pepReady: false, badges: [] };
+const S = { user: null, profile: null, tab: 'today', date: TODAY(), sups: [], logs: new Set(), streak: 0, loginEmail: '', loginStep: 'email', welcome: new URLSearchParams(location.search).has('welcome'), intake: null, program: null, suppIntake: null, protocol: null, nutIntake: null, mealPlan: null, settings: null, compounds: [], injLogs: [], overlay: null, pepReady: false, badges: [], weights: [], avReady: false };
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = (id, d) => id + '|' + d;
@@ -901,6 +944,7 @@ function viewToday() {
   const allDone = total && done === total;
   const msg = !total ? 'Add your supplements to start' : allDone ? 'All done. That\'s locking in.' : `${total - done} left to take`;
   return `
+    ${avatarCard()}
     <div class="day">
       <button id="prev" aria-label="Previous day">${ICON.left}</button>
       <div class="label"><b>${dayLabel(d)}</b><small>${new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</small></div>
@@ -938,6 +982,7 @@ function bindToday() {
   if (Q.on && Q.kind === 'supps') return bindQuestion();
   bindProtocolClient();
   if (S.protocol && !S.protocol.acknowledged_at) return;
+  bindAvatar();
   document.getElementById('prev').onclick = () => { S.date = addDays(S.date, -1); renderShell(); };
   document.getElementById('next').onclick = () => { if (S.date < TODAY()) { S.date = addDays(S.date, 1); renderShell(); } };
   document.getElementById('edit').onclick = () => openSheet(true);
@@ -1170,6 +1215,7 @@ async function loadCoach() {
   C.clients = clients || [];
   C.programs = {}; (programs || []).forEach(p => (C.programs[p.user_id] ||= []).push(p));
   C.intakes = {}; (intakes || []).forEach(i => { if (!C.intakes[i.user_id]) C.intakes[i.user_id] = i; });
+  try { C.weights = {}; (await api.coachWeights() || []).forEach(w => (C.weights[w.user_id] ||= []).push(w)); C.weightsReady = true; } catch (e) { C.weightsReady = false; }
   C.loaded = true;
 }
 function viewCoach() {
@@ -1237,7 +1283,8 @@ function viewCoachClient() {
     <div class="sec" style="margin-top:18px"><h2>Program</h2>${draft && draft.status !== 'generating' ? `<span class="pill hot">Draft, not visible to client</span>` : ''}</div>
     ${programPart}
     ${viewCoachSupps(c)}
-    ${viewCoachNutrition(c)}`;
+    ${viewCoachNutrition(c)}
+    ${viewCoachWeights(c)}`;
 }
 
 /* ----- Editor ----- */
@@ -1895,7 +1942,11 @@ function bindCoachNutrition() {
       const row = (C.mealPlans[C.sel] || []).find(p => ['draft', 'failed'].includes(p.status));
       if (row) api.coachSaveMealPlan(row.id, C.nedit).catch(() => {});
       renderShell(); toast(`Swapped "${old.title}" for "${out.meal.title}". Shopping list updated.`);
-    } catch (e) { btn.disabled = false; btn.textContent = 'Get a new meal'; $('swapCancel').disabled = false; toast(e.message || 'Swap failed. Try again.'); }
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Try again'; $('swapCancel').disabled = false;
+      const box = btn.closest('.swapbox'); let er = box.querySelector('.err'); if (!er) { er = document.createElement('div'); er.className = 'err'; er.style.textAlign = 'left'; box.appendChild(er); }
+      er.textContent = e.message || 'Swap failed. Try again.';
+    }
   });
   document.querySelectorAll('[data-nphoto]').forEach(b => b.onclick = async () => {
     const [ti, mi] = b.dataset.nphoto.split('.').map(Number), m = C.nedit.day_templates[ti].meals[mi];
@@ -2072,7 +2123,9 @@ function overlayHtml() {
     <div class="ov-top"><div class="display ov-title" style="margin:0">Injection <span class="accent">history</span></div><button class="link" id="pepClose">Close</button></div>
     <div class="list" style="margin-top:14px">${S.injLogs.slice(0, 40).map(l => { const c = (S.compounds || []).find(x => x.id === l.compound_id); return `
       <div class="edit-row"><div><div class="name">${esc(l.site)}</div><div class="dose">${esc(c ? c.name : 'Removed')} · ${whenStr(l.injected_at)}</div></div><button class="del" data-pepundo="${l.id}">Delete</button></div>`; }).join('') || '<p class="muted">No injections logged yet.</p>'}</div>`;
-  const full = ['pep-setup', 'pep-form', 'pep-log', 'pep-history'].includes(o);
+  if (o === 'av-setup' && A.form) inner = avSetupHtml();
+  if (o === 'av-log') inner = avLogHtml();
+  const full = ['pep-setup', 'pep-form', 'pep-log', 'pep-history', 'av-setup', 'av-log'].includes(o);
   return `<div class="ov-bg"></div><div class="ov ${full ? 'full' : ''}">${inner}</div>`;
 }
 
@@ -2094,6 +2147,7 @@ function bindOverlay() {
   $('pepHistory') && ($('pepHistory').onclick = () => openOverlay('pep-history'));
   $('pepSetup2') && ($('pepSetup2').onclick = () => openOverlay('pep-setup'));
   if (!S.overlay) return;
+  bindAvatarOverlay();
 
   $('pepYes') && ($('pepYes').onclick = () => openOverlay('pep-terms'));
   $('pepNo') && ($('pepNo').onclick = async () => { await saveSettings({ peptides_answered: true, peptides_enabled: false }); closeOverlay(); toast('Got it. You can turn it on anytime in the Me tab.'); });
@@ -2166,6 +2220,362 @@ function meInjectionCard() {
 }
 
 /* ==========================================================
+   PROGRESS AVATAR + WEIGH-INS
+   ========================================================== */
+// Half-widths (sw shoulders, cw chest, ww waist, hw hips), belly bulge (bb), full limb widths (aw arm, th thigh, ca calf), def = muscle-line strength
+const AV_SHAPES = {
+  Male: {
+    athletic: { sw: 31, cw: 27, ww: 19, bb: 0, hw: 21, aw: 11, th: 15, ca: 11, def: 1 },
+    soft:     { sw: 32, cw: 31, ww: 30, bb: 6, hw: 27, aw: 14, th: 19, ca: 13, def: 0 },
+    thin:     { sw: 23, cw: 20, ww: 16, bb: 0, hw: 17, aw: 7,  th: 10, ca: 8,  def: .3 },
+    big:      { sw: 37, cw: 32, ww: 21, bb: 0, hw: 22, aw: 15, th: 18, ca: 13, def: 1 },
+  },
+  Female: {
+    athletic: { sw: 25, cw: 23, ww: 16, bb: 0, hw: 25, aw: 8.5, th: 14, ca: 10, def: .8 },
+    soft:     { sw: 27, cw: 27, ww: 26, bb: 5, hw: 31, aw: 11,  th: 18, ca: 12, def: 0 },
+    thin:     { sw: 21, cw: 19, ww: 14, bb: 0, hw: 20, aw: 6.5, th: 10, ca: 8,  def: .2 },
+    big:      { sw: 28, cw: 25, ww: 17, bb: 0, hw: 28, aw: 10,  th: 17, ca: 12, def: 1 },
+  },
+};
+const AV_KEYS = ['sw', 'cw', 'ww', 'bb', 'hw', 'aw', 'th', 'ca', 'def'];
+const avLerp = (a, b, t) => Object.fromEntries(AV_KEYS.map(k => [k, a[k] + (b[k] - a[k]) * t]));
+const A = { shownP: null, view: 'now', raf: 0, form: null };
+
+// ---- geometry ----
+const f1 = n => Math.round(n * 10) / 10;
+function smooth(pts, closed = true) {   // Catmull-Rom → cubic Bézier
+  const n = pts.length, P = i => pts[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
+  let d = `M${f1(pts[0][0])} ${f1(pts[0][1])}`;
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    d += `C${f1(p1[0] + (p2[0] - p0[0]) / 6)} ${f1(p1[1] + (p2[1] - p0[1]) / 6)} ${f1(p2[0] - (p3[0] - p1[0]) / 6)} ${f1(p2[1] - (p3[1] - p1[1]) / 6)} ${f1(p2[0])} ${f1(p2[1])}`;
+  }
+  return d + (closed ? 'Z' : '');
+}
+function limb(c, w) {   // tapered tube along a centerline, rounded at the end
+  const R = [], L = [];
+  c.forEach((p, i) => {
+    const a = c[Math.max(0, i - 1)], b = c[Math.min(c.length - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+    R.push([p[0] - dy * w[i] / 2, p[1] + dx * w[i] / 2]); L.push([p[0] + dy * w[i] / 2, p[1] - dx * w[i] / 2]);
+  });
+  const e = c[c.length - 1], q = c[c.length - 2], el = Math.hypot(e[0] - q[0], e[1] - q[1]) || 1, ew = w[w.length - 1] * .55;
+  const cap = [e[0] + (e[0] - q[0]) / el * ew, e[1] + (e[1] - q[1]) / el * ew];
+  return smooth([...R, cap, ...L.reverse()]);
+}
+const circle = (x, y, r) => `M${f1(x - r)} ${f1(y)}a${f1(r)} ${f1(r)} 0 1 0 ${f1(2 * r)} 0a${f1(r)} ${f1(r)} 0 1 0 ${f1(-2 * r)} 0Z`;
+const mirror = (pts, cx) => pts.map(([x, y]) => [cx - x, y]);
+
+function avPaths(s, sex) {
+  const cx = 70, F = sex === 'Female', hr = F ? 11.5 : 12.5, nw = 5.5 + (s.sw - 21) * .15;
+  const R = (x, y) => [cx + x, y], Lx = (x, y) => [cx - x, y];
+  // torso: right side top→bottom, then mirrored back up
+  const side = [[nw, 37], [s.sw * .62, 45], [s.sw, 53], [s.cw, 64], [s.cw * .98, 74], [s.cw + (s.ww - s.cw) * .6 + s.bb * .5, 84], [s.ww + s.bb, 96], [s.hw, 108], [s.hw * .92, 117]];
+  const torso = smooth([[cx, 36], ...side.map(([x, y]) => R(x, y)), [cx, 121], ...side.slice().reverse().map(([x, y]) => Lx(x, y))]);
+  const neck = smooth([R(nw, 28), R(nw, 44), Lx(nw, 44), Lx(nw, 28)]);
+  // arms
+  const ex = Math.max(s.ww + s.bb * .9, s.cw * .9) + s.aw * .38 + 2, sx = s.sw - s.aw * .45;
+  const armC = [[sx, 52], [sx + (ex - sx) * .55, 71], [ex, 90], [ex + 1.2, 106], [ex + 2.5, 122]];
+  const armW = [s.aw * 1.15, s.aw * .95, s.aw * .72, s.aw * .82, s.aw * .55];
+  const hand = r => circle(cx + r * (ex + 3), 128, s.aw * .36 + 1.6);
+  // legs
+  const legC = [[s.hw * .5, 106], [s.hw * .47, 128], [s.hw * .4 + 1, 150], [s.hw * .38 + 1, 163], [s.hw * .34 + 1.5, 186]];
+  const legW = [s.hw, s.th * 1.2, s.th * .72, s.ca * 1.15, s.ca * .5];
+  const foot = r => { const x = cx + r * (s.hw * .34 + 3), rx = s.ca * .5 + 2.5; return `M${f1(x - rx)} 191a${f1(rx)} 3.4 0 1 0 ${f1(2 * rx)} 0a${f1(rx)} 3.4 0 1 0 ${f1(-2 * rx)} 0Z`; };
+  const side2 = (c, r) => c.map(([x, y]) => [cx + r * x, y]);
+  // hair
+  const cap = `M${cx - hr - .4} 21C${cx - hr} 9 ${cx + hr} 9 ${cx + hr + .4} 21C${cx + hr * .6} 15.5 ${cx - hr * .6} 15.5 ${cx - hr - .4} 21Z`;
+  const longHair = F ? smooth([[cx, 7.5], R(hr * 1.08, 12), R(hr * 1.25, 25), R(hr * 1.3, 40), R(hr * .95, 48), [cx, 44], Lx(hr * .95, 48), Lx(hr * 1.3, 40), Lx(hr * 1.25, 25), Lx(hr * 1.08, 12)]) : '';
+  // muscle lines
+  const pec = `M${f1(cx - s.cw * .78)} 66Q${f1(cx - s.cw * .38)} 77 ${cx - 1} 72M${f1(cx + s.cw * .78)} 66Q${f1(cx + s.cw * .38)} 77 ${cx + 1} 72`;
+  const abs = [84, 92, 100].map(y => `M${f1(cx - s.ww * .42)} ${y}Q${cx} ${y + 1.6} ${f1(cx + s.ww * .42)} ${y}`).join('') + `M${cx} 64L${cx} 106`;
+  const delt = [1, -1].map(r => `M${f1(cx + r * (sx - s.aw * .2))} 58Q${f1(cx + r * (sx + s.aw * .5))} 62 ${f1(cx + r * (sx + (ex - sx) * .4 + s.aw * .45))} 66`).join('');
+  const quads = [1, -1].map(r => `M${f1(cx + r * s.hw * .48)} 122Q${f1(cx + r * s.hw * .4)} 134 ${f1(cx + r * (s.hw * .4 + 1))} 145`).join('');
+  return {
+    hair: longHair, legR: limb(side2(legC, 1), legW), legL: limb(side2(legC, -1), legW), footR: foot(1), footL: foot(-1),
+    armR: limb(side2(armC, 1), armW), armL: limb(side2(armC, -1), armW), handR: hand(1), handL: hand(-1),
+    torso, neck, head: circle(cx, 21, hr), cap, pec, abs: F ? abs.replace(/M70 64L70 106$/, '') : abs, delt, quads,
+  };
+}
+const AV_FILL = ['legR', 'legL', 'footR', 'footL', 'armR', 'armL', 'handR', 'handL', 'torso', 'neck', 'head'];
+const AV_LINES = ['pec', 'abs', 'delt', 'quads'];
+let avUid = 0;
+function avatarSvg(s, sex, { glow = .5, id = '' } = {}) {
+  const p = avPaths(s, sex), g = 'avg' + (++avUid);
+  const blur = f1(4 + glow * 12), alpha = f1(.15 + glow * .5);
+  return `<svg ${id ? `id="${id}"` : ''} viewBox="0 0 140 200" aria-hidden="true" style="filter:drop-shadow(0 0 ${blur}px rgba(var(--accent-rgb),${alpha}))">
+    <defs><linearGradient id="${g}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="200"><stop offset="0" style="stop-color:var(--accent-2)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>
+    <ellipse cx="70" cy="195" rx="34" ry="4" fill="rgba(0,0,0,.45)"/>
+    ${sex === 'Female' ? `<path data-k="hair" d="${p.hair}" fill="url(#${g})"/><path data-k="hair" d="${p.hair}" fill="rgba(0,0,0,.32)"/>` : ''}
+    <g fill="url(#${g})">${AV_FILL.map(k => `<path data-k="${k}" d="${p[k]}"/>`).join('')}</g>
+    <path data-k="cap" d="${p.cap}" fill="rgba(0,0,0,.32)"/>
+    <g fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1.2" stroke-linecap="round" data-def style="opacity:${f1(s.def)}">${AV_LINES.map(k => `<path data-k="${k}" d="${p[k]}"/>`).join('')}</g>
+    <ellipse cx="${f1(70 - s.cw * .45)}" cy="70" rx="${f1(s.cw * .22)}" ry="16" fill="rgba(255,255,255,.07)" data-k="shine"/>
+  </svg>`;
+}
+function avRedraw(el, s, sex) {   // update an existing SVG in place (used by the morph animation)
+  if (!el) return; const p = avPaths(s, sex);
+  el.querySelectorAll('[data-k]').forEach(n => { const k = n.dataset.k; if (k === 'shine') { n.setAttribute('cx', f1(70 - s.cw * .45)); n.setAttribute('rx', f1(s.cw * .22)); } else if (p[k] != null) n.setAttribute('d', p[k]); });
+  const d = el.querySelector('[data-def]'); if (d) d.style.opacity = f1(s.def);
+}
+
+// ---- data helpers ----
+function avGentle() {   // eating-disorder history or under 18 → no weight-driven body changes
+  const h = S.nutIntake?.answers?.eating_history, age = Number(S.intake?.answers?.age);
+  return h === 'Yes' || h === 'Prefer not to say' || (age > 0 && age < 18);
+}
+const avSexGuess = () => { const x = S.intake?.answers?.sex || S.nutIntake?.answers?.sex; return x === 'Male' || x === 'Female' ? x : null; };
+function avGoalGuess() { const g = S.intake?.answers?.goal || ''; return /lose/i.test(g) ? 'lose' : /build|stronger/i.test(g) ? 'gain' : 'recomp'; }
+const avSt = () => S.settings || {};
+function avConfigured() {
+  const st = avSt(); if (!st.avatar_sex) return false;
+  if (avGentle() || st.avatar_goal === 'recomp') return true;
+  return !!(st.avatar_goal && st.start_weight && st.goal_weight);
+}
+function avEnds(sex, goal) {
+  const T = AV_SHAPES[sex] || AV_SHAPES.Male, mid = avLerp(T.soft, T.athletic, .5);
+  if (avGentle() || goal === 'recomp') return [mid, T.athletic];
+  return goal === 'gain' ? [T.thin, T.big] : [T.soft, T.athletic];
+}
+const weightsAsc = () => (S.weights || []).slice().sort((a, b) => a.log_date < b.log_date ? -1 : 1);
+const latestW = () => { const w = weightsAsc(); return w.length ? Number(w[w.length - 1].weight_lb) : null; };
+function avConsistency() {
+  const since = avSt().avatar_started_at || '0000-00-00', days = new Set();
+  S.logs.forEach(k => { const d = k.split('|')[1]; if (d >= since) days.add(d); });
+  (S.weights || []).forEach(w => { if (w.log_date >= since) days.add(w.log_date); });
+  const n = days.size; return { days: n, level: Math.min(10, 1 + Math.floor(n / 9)), p: Math.min(1, n / 90) };
+}
+function avProgress() {
+  const st = avSt();
+  if (avGentle() || st.avatar_goal === 'recomp') return avConsistency().p;
+  const s = Number(st.start_weight), g = Number(st.goal_weight), cur = latestW() ?? s;
+  if (!s || !g || s === g) return 0;
+  return Math.max(0, Math.min(1, st.avatar_goal === 'lose' ? (s - cur) / (s - g) : (cur - s) / (g - s)));
+}
+const avTargetP = () => A.view === 'start' ? 0 : A.view === 'goal' ? 1 : avProgress();
+const avGlow = () => Math.min(1, .15 + Math.min(S.streak, 30) / 30 * .85);
+const lb = n => (Math.round(Number(n) * 10) / 10).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+function sparkline(vals, w = 150, h = 34) {
+  if (vals.length < 2) return '';
+  const lo = Math.min(...vals), hi = Math.max(...vals), rng = hi - lo || 1;
+  const pts = vals.map((v, i) => [f1(i / (vals.length - 1) * (w - 6) + 3), f1(h - 4 - (v - lo) / rng * (h - 8))]);
+  const last = pts[pts.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="3" fill="var(--accent-2)"/></svg>`;
+}
+
+// ---- Today card ----
+function avatarCard() {
+  if (!S.avReady || avSt().avatar_off) return '';
+  if (!avConfigured()) {
+    const sex = avSexGuess() || 'Male', [a, b] = avEnds(sex, avGoalGuess());
+    return `<div class="card av-cta">
+      <div class="av-mini">${avatarSvg(a, sex, { glow: .2 })}<span>→</span>${avatarSvg(b, sex, { glow: .8 })}</div>
+      <div><div class="k">New</div><div class="display" style="font-size:24px;margin:6px 0 6px">Your progress <span class="accent">avatar</span></div>
+      <p class="muted" style="font-size:13px;margin:0 0 12px">${avGentle() ? 'It levels up every day you show up.' : 'It changes shape as you get closer to your goal.'}</p>
+      <button class="btn btn-primary" id="avSetup" style="padding:12px">Set it up</button></div></div>`;
+  }
+  const st = avSt(), sex = st.avatar_sex, [a, b] = avEnds(sex, st.avatar_goal);
+  if (A.shownP == null) A.shownP = avTargetP();
+  const shape = avLerp(a, b, A.shownP), tag = { now: 'NOW', start: 'START', goal: 'GOAL' }[A.view];
+  const fig = `<button class="av-fig" id="avFig" aria-label="Compare start, now and goal">${avatarSvg(shape, sex, { glow: avGlow(), id: 'avSvg' })}<span class="av-tag ${A.view}">${tag}</span></button>`;
+  const head = `<div class="k" style="display:flex;justify-content:space-between;align-items:center"><span>Your progress</span><button class="link" id="avEdit" style="font-size:12px">Edit</button></div>`;
+  const ws = weightsAsc(), vals = ws.slice(-30).map(w => Number(w.weight_lb));
+  let info;
+  if (avGentle()) {
+    const c = avConsistency();
+    info = `${head}<div class="av-pct"><b class="display">Lv ${c.level}</b><small>${c.level >= 10 ? 'max level' : 'consistency'}</small></div>
+      <div class="av-d">${c.days} day${c.days === 1 ? '' : 's'} locked in</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Your figure levels up every day you check in.</p>`;
+  } else if (st.avatar_goal === 'recomp') {
+    const c = avConsistency(), cur = latestW();
+    info = `${head}<div class="av-pct"><b class="display">Lv ${c.level}</b><small>recomp</small></div>
+      <div class="av-d">${c.days} day${c.days === 1 ? '' : 's'} locked in${cur ? ` · ${lb(cur)} lb` : ''}</div>
+      ${sparkline(vals)}<button class="btn btn-primary av-log" id="avLog">Log weight</button>`;
+  } else {
+    const pct = Math.round(avProgress() * 100), cur = latestW() ?? Number(st.start_weight), diff = cur - Number(st.start_weight);
+    info = `${head}<div class="av-pct"><b class="display">${pct}%</b><small>${pct >= 100 ? 'goal hit' : 'to goal'}</small></div>
+      <div class="av-w">${lb(cur)} lb <span class="muted">→ ${lb(st.goal_weight)}</span></div>
+      <div class="av-d">${Math.abs(diff) < .05 ? 'Starting point' : `${diff < 0 ? '↓' : '↑'} ${lb(Math.abs(diff))} lb since start`}</div>
+      ${sparkline(vals)}<button class="btn btn-primary av-log" id="avLog">Log weight</button>`;
+  }
+  return `<div class="card av-card">${fig}<div class="av-info">${info}</div></div>`;
+}
+function avAnimate(to, ms = 900) {
+  cancelAnimationFrame(A.raf);
+  const st = avSt(), sex = st.avatar_sex; if (!sex) return;
+  const [a, b] = avEnds(sex, st.avatar_goal), from = A.shownP ?? to;
+  if (Math.abs(from - to) < .001 || reduceMotion()) { A.shownP = to; avRedraw(document.getElementById('avSvg'), avLerp(a, b, to), sex); return; }
+  const t0 = performance.now(), ease = t => t < .5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+  const step = now => {
+    const t = Math.min(1, (now - t0) / ms); A.shownP = from + (to - from) * ease(t);
+    avRedraw(document.getElementById('avSvg'), avLerp(a, b, A.shownP), sex);
+    if (t < 1) A.raf = requestAnimationFrame(step);
+  };
+  A.raf = requestAnimationFrame(step);
+}
+function bindAvatar() {
+  const $ = id => document.getElementById(id);
+  $('avSetup') && ($('avSetup').onclick = () => avOpenSetup(false));
+  $('avEdit') && ($('avEdit').onclick = () => avOpenSetup(true));
+  $('avLog') && ($('avLog').onclick = () => openOverlay('av-log'));
+  $('avFig') && ($('avFig').onclick = () => {
+    A.view = { now: 'start', start: 'goal', goal: 'now' }[A.view];
+    const t = $('avFig').querySelector('.av-tag'); t.textContent = A.view.toUpperCase(); t.className = 'av-tag ' + A.view;
+    if (navigator.vibrate) navigator.vibrate(8);
+    avAnimate(avTargetP(), 700);
+  });
+  if ($('avSvg') && A.shownP != null && Math.abs(A.shownP - avTargetP()) > .001) avAnimate(avTargetP());
+}
+
+// ---- Setup + log overlays ----
+function avOpenSetup(editing) {
+  const st = avSt();
+  A.form = { editing, sex: st.avatar_sex || avSexGuess() || '', goal: st.avatar_goal || avGoalGuess(),
+    start: st.start_weight ?? (latestW() ?? (parseFloat(S.intake?.answers?.weight || S.nutIntake?.answers?.weight) || '')), goalW: st.goal_weight ?? '' };
+  openOverlay('av-setup');
+}
+function avMinGoal() {   // keeps goal weights inside a healthy range for their height (BMI 18.5+)
+  const h = S.intake?.answers?.height || S.nutIntake?.answers?.height; if (!h) return 0;
+  const s = String(h).toLowerCase(); let inch = null;
+  const cm = s.match(/(\d{3}(?:\.\d+)?)\s*cm/), ft = s.match(/(\d)\s*(?:'|’|ft|feet|foot)\s*(\d{1,2}(?:\.\d+)?)?/);
+  if (cm) inch = cm[1] / 2.54; else if (ft) inch = +ft[1] * 12 + +(ft[2] || 0); else { const n = parseFloat(s); if (n >= 48 && n <= 90) inch = n; }
+  return inch ? Math.ceil(18.5 * inch * inch / 703) : 0;
+}
+function avSetupHtml() {
+  const f = A.form, g = avGentle(), sex = f.sex || 'Male', [a, b] = avEnds(sex, f.goal);
+  return `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">Your <span class="accent">avatar</span></div><button class="link" id="avCancel">Cancel</button></div>
+    <div class="av-prev">${avatarSvg(a, sex, { glow: .2 })}<span>→</span>${avatarSvg(b, sex, { glow: .9 })}</div>
+    <label class="lbl">Figure</label>
+    <div class="seg"><button class="${f.sex === 'Male' ? 'on' : ''}" data-avsex="Male">Male</button><button class="${f.sex === 'Female' ? 'on' : ''}" data-avsex="Female">Female</button></div>
+    ${g ? `<p class="muted" style="font-size:13px;margin-top:16px">Your figure levels up with consistency. Every day you check in counts, no scale needed.</p>` : `
+    <label class="lbl">Goal</label>
+    <div class="seg seg3"><button class="${f.goal === 'lose' ? 'on' : ''}" data-avgoal="lose">Lose fat</button><button class="${f.goal === 'gain' ? 'on' : ''}" data-avgoal="gain">Build muscle</button><button class="${f.goal === 'recomp' ? 'on' : ''}" data-avgoal="recomp">Recomp</button></div>
+    ${f.goal === 'recomp' ? `<p class="muted" style="font-size:12px;margin-top:8px">Recomp levels up with consistency, since your weight may barely move. You can still log weigh-ins.</p>` : ''}
+    <label class="lbl">${f.editing ? 'Starting weight' : 'Current weight'} (lb)</label>
+    <input class="field" id="avStart" type="number" inputmode="decimal" step="0.1" placeholder="180" value="${esc(f.start)}" />
+    ${f.goal !== 'recomp' ? `<label class="lbl">Goal weight (lb)</label><input class="field" id="avGoalW" type="number" inputmode="decimal" step="0.1" placeholder="${f.goal === 'gain' ? '190' : '170'}" value="${esc(f.goalW)}" />` : ''}`}
+    <div class="err" id="err"></div>
+    <button class="btn btn-primary" id="avSave" style="margin-top:8px">Save</button>
+    ${g ? '' : `<p class="muted" style="font-size:12px;text-align:center;margin-top:10px">Zane can see your weigh-ins. Your goal weight stays private.</p>`}`;
+}
+function avLogHtml() {
+  const ws = weightsAsc().reverse(), last = ws[0];
+  return `
+    <div class="ov-top"><div class="display ov-title" style="margin:0">Log <span class="accent">weight</span></div><button class="link" id="avClose">Close</button></div>
+    <div class="av-entry"><input class="field" id="avW" type="number" inputmode="decimal" step="0.1" placeholder="lb" value="${last ? esc(last.weight_lb) : ''}" /><span>lb</span></div>
+    <div class="err" id="err"></div>
+    <button class="btn btn-primary" id="avSaveW">Save weigh-in</button>
+    <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">Tip: weigh in the morning, after the bathroom, before eating. Logging again today replaces today's.</p>
+    ${ws.length ? `<div class="k" style="margin-top:18px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Recent</div>
+    <div class="list">${ws.slice(0, 10).map(w => `<div class="edit-row"><div><div class="name">${lb(w.weight_lb)} lb</div><div class="dose">${new Date(w.log_date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div></div><button class="del" data-avdel="${w.id}">Delete</button></div>`).join('')}</div>` : ''}`;
+}
+async function avSaveSettings(fields) {
+  S.settings = { ...(S.settings || {}), ...fields };
+  const r = await api.saveSettings(S.settings);
+  if (r && r.avatarMissing) throw new Error('Run the phase 9 SQL in Supabase first.');
+}
+function bindAvatarOverlay() {
+  const $ = id => document.getElementById(id);
+  if (S.overlay === 'av-setup') {
+    const f = A.form, keep = () => { if ($('avStart')) f.start = $('avStart').value; if ($('avGoalW')) f.goalW = $('avGoalW').value; };
+    $('avCancel').onclick = closeOverlay;
+    document.querySelectorAll('[data-avsex]').forEach(b => b.onclick = () => { keep(); f.sex = b.dataset.avsex; renderShell(); });
+    document.querySelectorAll('[data-avgoal]').forEach(b => b.onclick = () => { keep(); f.goal = b.dataset.avgoal; renderShell(); });
+    $('avSave').onclick = async () => {
+      keep();
+      if (!f.sex) return renderErr('Pick a figure.');
+      const g = avGentle(), start = parseFloat(f.start), goalW = parseFloat(f.goalW);
+      if (!g) {
+        if (!(start >= 50 && start <= 800)) return renderErr('Enter your weight in pounds.');
+        if (f.goal !== 'recomp') {
+          if (!(goalW >= 50 && goalW <= 800)) return renderErr('Enter a goal weight in pounds.');
+          if (f.goal === 'lose' && goalW >= start) return renderErr('For fat loss, your goal should be lower than your starting weight.');
+          if (f.goal === 'gain' && goalW <= start) return renderErr('For building muscle, your goal should be higher than your starting weight.');
+          const min = avMinGoal();
+          if (min && goalW < min) return renderErr(`Pick a goal of at least ${min} lb. That's the healthy range for your height. Talk to Zane if you're unsure.`);
+        }
+      }
+      $('avSave').disabled = true;
+      const st = avSt(), fresh = !f.editing || !st.avatar_started_at;
+      try {
+        await avSaveSettings({ avatar_sex: f.sex, avatar_goal: g ? (st.avatar_goal || 'recomp') : f.goal, start_weight: g ? null : start, goal_weight: g || f.goal === 'recomp' ? null : goalW,
+          avatar_started_at: fresh ? TODAY() : st.avatar_started_at, avatar_off: false });
+        if (!g && fresh && !(S.weights || []).some(w => w.log_date === TODAY())) {
+          const row = await api.logWeight(start, TODAY()); S.weights = [row, ...(S.weights || [])];
+        }
+        A.view = 'now'; A.shownP = 0; A.form = null; closeOverlay();
+        toast(f.editing ? 'Avatar updated' : 'Avatar is live. Log weigh-ins to watch it change.');
+      } catch (e) { $('avSave').disabled = false; renderErr(e.message?.includes('phase 9') ? e.message : "Couldn't save. Check your connection."); }
+    };
+  }
+  if (S.overlay === 'av-log') {
+    $('avClose').onclick = closeOverlay;
+    setTimeout(() => $('avW')?.select(), 200);
+    $('avSaveW').onclick = async () => {
+      const w = parseFloat($('avW').value);
+      if (!(w >= 50 && w <= 800)) return renderErr('Enter your weight in pounds.');
+      $('avSaveW').disabled = true;
+      const before = avProgress();
+      try {
+        const row = await api.logWeight(Math.round(w * 10) / 10, TODAY());
+        S.weights = [row, ...(S.weights || []).filter(x => x.log_date !== row.log_date)];
+        if (navigator.vibrate) navigator.vibrate(12);
+        A.view = 'now'; closeOverlay();
+        avMilestones(before, avProgress());
+      } catch (e) { $('avSaveW').disabled = false; renderErr("Couldn't save. Check your connection."); }
+    };
+    document.querySelectorAll('[data-avdel]').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this weigh-in?')) return;
+      try { await api.deleteWeight(b.dataset.avdel); S.weights = S.weights.filter(w => w.id !== b.dataset.avdel); renderShell(); } catch (e) { toast("Couldn't delete it."); }
+    });
+  }
+}
+function avMilestones(before, after) {
+  const st = avSt(); if (avGentle() || st.avatar_goal === 'recomp') return;
+  const k = 'wt-av-ms-' + S.user.id + '-' + (st.avatar_started_at || ''); let hit = [];
+  try { hit = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
+  const MS = [[25, 'Quarter way there', 'Your avatar is changing. Keep going.'], [50, 'Halfway', 'Half the work is done. Lock in.'], [75, 'Almost there', 'The finish line is in sight.'], [100, 'Goal reached', 'You did what you said you would.']];
+  MS.forEach(([n, t, sub]) => { if (before * 100 < n && after * 100 >= n && !hit.includes(n)) { hit.push(n); queueCelebration({ type: 'burst', title: t, sub }); } });
+  try { localStorage.setItem(k, JSON.stringify(hit)); } catch (e) {}
+}
+function meAvatarCard() {
+  if (!S.avReady) return '';
+  const off = avSt().avatar_off, set = avConfigured();
+  return `<div class="card"><div class="k">Progress avatar</div>
+    ${off || !set ? `<div class="v txt">${off ? 'Hidden from your Today tab.' : 'Not set up yet.'}</div><button class="btn btn-ghost" id="avOn" style="margin-top:12px">${off ? 'Show avatar' : 'Set it up'}</button>`
+    : `<div class="v txt">On</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn btn-ghost" id="avEdit2" style="padding:12px">Edit goal</button>${avGentle() ? '' : '<button class="btn btn-ghost" id="avHist" style="padding:12px">Weigh-ins</button>'}</div>
+      <button class="btn" id="avOff" style="margin-top:6px;color:var(--muted);padding:10px">Hide avatar</button>`}</div>`;
+}
+function bindMeAvatar() {
+  const $ = id => document.getElementById(id);
+  $('avOn') && ($('avOn').onclick = async () => { if (!avConfigured()) return avOpenSetup(false); try { await avSaveSettings({ avatar_off: false }); } catch (e) { toast(e.message); } renderShell(); });
+  $('avEdit2') && ($('avEdit2').onclick = () => avOpenSetup(true));
+  $('avHist') && ($('avHist').onclick = () => openOverlay('av-log'));
+  $('avOff') && ($('avOff').onclick = async () => { try { await avSaveSettings({ avatar_off: true }); } catch (e) { toast(e.message); } renderShell(); });
+}
+
+// ---- Coach view ----
+function viewCoachWeights(c) {
+  if (!C.weightsReady) return '';
+  const ws = (C.weights[c.id] || []).slice().sort((a, b) => a.log_date < b.log_date ? -1 : 1);
+  if (!ws.length) return `<div class="sec" style="margin-top:18px"><h2>Weigh-ins</h2></div><div class="empty"><b>No weigh-ins yet</b>They log them from the Today tab after setting up their avatar.</div>`;
+  const first = Number(ws[0].weight_lb), last = Number(ws[ws.length - 1].weight_lb), d = last - first;
+  const fmt = s => new Date(s + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `<div class="sec" style="margin-top:18px"><h2>Weigh-ins</h2><span class="pill">${ws.length} logged</span></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+      <div><div class="k">Latest</div><div class="v">${lb(last)} lb <span class="muted" style="font-size:13px;font-weight:500">${fmt(ws[ws.length - 1].log_date)}</span></div></div>
+      <div style="text-align:right"><div class="k">Since ${fmt(ws[0].log_date)}</div><div class="v">${Math.abs(d) < .05 ? '±0' : (d < 0 ? '−' : '+') + lb(Math.abs(d))} lb</div></div></div>
+      <div style="margin-top:10px">${sparkline(ws.slice(-60).map(w => Number(w.weight_lb)), 300, 44)}</div>
+      <details style="margin-top:8px"><summary class="muted" style="font-size:13px">All weigh-ins</summary>
+        <div class="answers">${ws.slice().reverse().slice(0, 40).map(w => `<div><span>${fmt(w.log_date)}</span><b>${lb(w.weight_lb)} lb</b></div>`).join('')}</div></details>
+    </div>`;
+}
+
+/* ==========================================================
    BADGES + CELEBRATIONS
    ========================================================== */
 const BADGES = [
@@ -2227,6 +2637,7 @@ function nextCelebration() {
   if (c.type === 'day') showBurst('Day locked in', c.sub, 1900);
   else if (c.type === 'shop') showBurst('Stocked up', 'Go prep and lock in', 1600);
   else if (c.type === 'badge') showBadge(c.badge);
+  else if (c.type === 'burst') showBurst(c.title, c.sub, 2200);
 }
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function sparks(n = 26) {
@@ -2303,14 +2714,15 @@ function viewMe() {
     <div class="card"><div class="k">Email</div><div class="v">${esc(p.email || S.user.email)}</div></div>
     <div class="card"><div class="k">Plan</div><div class="v">${p.tier === 'transformation' ? 'Transformation Coaching' : p.tier === 'fitness' ? 'Fitness Coaching' : 'Member'}</div></div>
     ${badgesCard()}
+    ${meAvatarCard()}
     ${appearanceCard()}
     ${S.pepReady && !(Number(S.intake?.answers?.age) < 18) ? meInjectionCard() : ''}
     ${cfg.BILLING_PORTAL_URL ? `<a class="btn btn-ghost" style="margin-top:14px" href="${esc(cfg.BILLING_PORTAL_URL)}" target="_blank" rel="noopener">Manage Billing</a>
     <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">Update your card or cancel. Log in with ${esc(p.email || S.user.email)}.</p>` : ''}
     <button class="btn btn-ghost" id="out" style="margin-top:14px">Sign Out</button>`;
 }
-function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; if (S.tab === 'me') { bindAppearance(); bindBadges(); } }
-async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = S.nutIntake = S.mealPlan = null; N.loadedFor = null; N.checked = new Set(); N.view = 'plan'; S.settings = null; S.compounds = []; S.injLogs = []; S.overlay = null; S.badges = []; document.body.style.overflow = ''; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
+function bindMe() { const b = document.getElementById('out'); if (b && S.tab === 'me') b.onclick = signOut; if (S.tab === 'me') { bindAppearance(); bindBadges(); bindMeAvatar(); } }
+async function signOut() { await api.signOut(); stopPoll(); S.user = null; S.tab = 'today'; S.intake = S.program = S.suppIntake = S.protocol = S.nutIntake = S.mealPlan = null; N.loadedFor = null; N.checked = new Set(); N.view = 'plan'; S.settings = null; S.compounds = []; S.injLogs = []; S.overlay = null; S.badges = []; S.weights = []; S.avReady = false; A.shownP = null; A.view = 'now'; A.form = null; document.body.style.overflow = ''; Q.on = false; C.loaded = false; C.sel = null; S.loginStep = 'email'; sheetOpen = false; $app.classList.remove('wide'); renderLogin(); }
 
 /* ---------- Streak ---------- */
 function computeStreak() {
@@ -2348,6 +2760,8 @@ async function loadData() {
     const [st, cs, lg] = await Promise.all([api.settings(), api.compounds(), api.injLogs()]);
     S.settings = st; S.compounds = cs || []; S.injLogs = lg || []; S.pepReady = true;
   } catch (e) { S.pepReady = false; } // tracker tables not set up yet → hide the feature
+  try { S.weights = (await api.weights(S.user.id)) || []; S.avReady = S.pepReady; }
+  catch (e) { S.weights = []; S.avReady = false; }   // phase 9 not run yet → hide the avatar
   try { S.badges = await api.badges() || []; }
   catch (e) { try { S.badges = JSON.parse(localStorage.getItem('wt-badges-' + S.user.id) || '[]'); } catch (_) { S.badges = []; } }
   // Self-heal: if they submitted a questionnaire but nothing's published yet, nudge the server.
