@@ -97,6 +97,6 @@ ${JSON.stringify(plan.shopping_list || [])}`;
     return json({ meal, shopping_list });
   } catch (err) {
     console.error(err);
-    return json({ error: 'Swap failed. Try again.' }, 502);
+    return json({ error: `Swap failed: ${String(err.message || err).slice(0, 220)}` }, 502);
   }
 }
