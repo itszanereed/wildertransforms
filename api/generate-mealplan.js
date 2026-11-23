@@ -4,6 +4,7 @@
 
 import { env, sb, caller, telegram, askClaudeForJson, json, esc } from './_shared.js';
 import { TARGETS, NUTRITION_RULES } from './_nutrition-rules.js';
+import { addPhotosToPlan } from './_photos.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SECTIONS = ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Grains & Bread', 'Pantry', 'Frozen', 'Other'];
@@ -80,11 +81,12 @@ const MEALPLAN_TOOL = {
                 properties: {
                   slot: { type: 'string', description: 'e.g. "Breakfast", "Lunch", "Snack", "Dinner"' },
                   title: { type: 'string' },
+                  photo_query: { type: 'string', description: '2–4 word stock-photo search for how this dish looks, e.g. "chicken rice bowl", "overnight oats berries"' },
                   ingredients: { type: 'array', items: { type: 'string' }, description: 'Each with amount, e.g. "6 oz chicken breast"' },
                   instructions: { type: 'string' },
                   calories: num, protein_g: num, carbs_g: num, fat_g: num,
                 },
-                required: ['slot', 'title', 'ingredients', 'instructions', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+                required: ['slot', 'title', 'photo_query', 'ingredients', 'instructions', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
               },
             },
           },
@@ -178,6 +180,8 @@ export async function POST(request) {
 
   const [draftRow] = await sb(`/rest/v1/meal_plans?select=id,data&user_id=eq.${targetId}&status=in.(generating,draft,failed,flagged)&order=created_at.desc&limit=1`);
   const previous = body.instructions && draftRow?.data ? draftRow.data : null;
+  const [pubRow] = await sb(`/rest/v1/meal_plans?select=data&user_id=eq.${targetId}&status=eq.published&order=published_at.desc&limit=1`).catch(() => []);
+  const dislikes = [...new Set([...(draftRow?.data?.dislikes || []), ...(pubRow?.data?.dislikes || [])])].slice(0, 40);
   let rowId = draftRow?.id;
   if (rowId) await sb(`/rest/v1/meal_plans?id=eq.${rowId}`, { method: 'PATCH', body: JSON.stringify({ status: 'generating', error: null, updated_at: new Date().toISOString() }) });
   else rowId = (await sb('/rest/v1/meal_plans', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: targetId, status: 'generating' }) }))[0].id;
@@ -197,6 +201,7 @@ Never mention weight loss, "clean" vs "bad" foods, or restriction. Keep the tone
   } else {
     user += `\n\nDAILY TARGETS (calculated, hit these within about 5%): ${targets.calories} kcal, ${targets.protein_g} g protein, ${targets.carbs_g} g carbs, ${targets.fat_g} g fat.`;
   }
+  if (dislikes.length) user += `\n\nThings this client has said they DON'T like (never include these): ${dislikes.join('; ')}`;
   if (previous) user += `\n\nZane's current draft (revise this, keep what he didn't ask to change):\n${JSON.stringify(previous)}`;
   if (body.instructions) user += `\n\nZane's instructions for this version (these take priority):\n${String(body.instructions).slice(0, 2000)}`;
 
@@ -219,8 +224,9 @@ Never mention weight loss, "clean" vs "bad" foods, or restriction. Keep the tone
     const data = {
       summary: plan.summary, gentle,
       targets: targets ? { calories: targets.calories, protein_g: targets.protein_g, carbs_g: targets.carbs_g, fat_g: targets.fat_g } : null,
-      day_templates, week, shopping_list, prep_tips: plan.prep_tips || [],
+      day_templates, week, shopping_list, prep_tips: plan.prep_tips || [], dislikes,
     };
+    await addPhotosToPlan(data).catch(() => {});
     const notes = [
       targets ? `Maintenance ≈ ${targets.maintenance} kcal · BMI ${targets.bmi}. ${targets.notes.join(' ')}` : 'Gentle plan: no numbers shown to the client.',
       plan.coach_notes || '',
