@@ -166,8 +166,15 @@ async function onPaymentFailed(inv) {
 // ---------- Entry point ----------
 export async function POST(request) {
   const raw = await request.text();
-  if (!verifyStripe(raw, request.headers.get('stripe-signature'), env('STRIPE_WEBHOOK_SECRET'))) {
-    return new Response('Bad signature', { status: 400 });
+  const secret = env('STRIPE_WEBHOOK_SECRET'), header = request.headers.get('stripe-signature');
+  // Plain-English reasons show up in Stripe → Webhooks → event → Response
+  if (!secret) return new Response('Bad signature: STRIPE_WEBHOOK_SECRET is not set in Vercel (or Vercel was not redeployed after adding it).', { status: 400 });
+  if (!secret.startsWith('whsec_')) return new Response(`Bad signature: STRIPE_WEBHOOK_SECRET in Vercel should start with whsec_ but starts with "${secret.slice(0, 3)}". You pasted a different Stripe key.`, { status: 400 });
+  if (!header) return new Response('Bad signature: request has no stripe-signature header (not sent by Stripe).', { status: 400 });
+  if (!verifyStripe(raw, header, secret)) {
+    const t = Number((header.match(/t=(\d+)/) || [])[1]);
+    if (t && Math.abs(Date.now() / 1000 - t) > 300) return new Response('Bad signature: event timestamp is too old. Click Resend in Stripe to send a fresh copy.', { status: 400 });
+    return new Response(`Bad signature: the whsec_ secret in Vercel (${secret.length} characters, ends in ...${secret.slice(-2)}) does not match this webhook. Copy the signing secret from THIS webhook in Stripe, paste it into Vercel, and redeploy.`, { status: 400 });
   }
 
   let event;
