@@ -176,6 +176,10 @@
   .apply-card .btn{width:100%;margin-top:24px;font-size:16px;padding:18px}
   .success{display:none;text-align:center;padding:20px 0}
   .success.show{display:block}
+  .cal-box{display:none;min-width:280px;height:700px;margin:0 -12px 18px;border-radius:16px;overflow:hidden}
+  .cal-box.on{display:block}
+  .cal-done{display:none;color:var(--accent)!important;font-weight:700}
+  @media (max-width:600px){.cal-box{height:760px;margin:0 -18px 18px}}
   .success .check{width:64px;height:64px;border-radius:50%;background:rgba(255,106,26,.12);border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;margin:0 auto 20px}
   .success h3{font-size:36px;margin-bottom:10px}
   .success p{color:var(--muted);margin-bottom:24px}
@@ -398,9 +402,10 @@
       <div class="success" id="success">
         <div class="check" style="width:64px;height:64px;border-radius:50%;background:rgba(255,106,26,.12);border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;margin:0 auto 20px;padding:0"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
         <h3>Application Received</h3>
-        <p>Step 2: book your call below. You'll get a calendar invite by email once it's booked.</p>
-        <!-- Replace # with your Calendly / Cal.com link -->
-        <a href="#" class="btn btn-primary">Book My Call</a>
+        <p>Step 2: pick a time for your call below. You'll get a calendar invite by email once it's booked.</p>
+        <div id="calendlyBox" class="cal-box" aria-label="Book your call"></div>
+        <a href="https://calendly.com/reedzane983/consultation" id="bookLink" class="btn btn-primary" target="_blank" rel="noopener">Book My Call</a>
+        <p class="cal-done" id="calDone">You're booked. Check your email for the invite. Talk soon.</p>
       </div>
     </div>
   </div>
@@ -465,11 +470,32 @@
       if (!res.ok) throw new Error('Request failed');
       form.style.display = 'none';
       document.getElementById('success').classList.add('show');
+      openCalendly(data.name, data.email);
     } catch (_) {
       showErr('Something went wrong sending your application. Please try again.');
       submitBtn.disabled = false;
       submitBtn.innerHTML = original;
     }
+  });
+
+  // Step 2: Calendly opens right on the page, with their name + email filled in
+  const CALENDLY_URL = 'https://calendly.com/reedzane983/consultation';
+  function openCalendly(name, email) {
+    const box = document.getElementById('calendlyBox'), link = document.getElementById('bookLink');
+    const q = new URLSearchParams({ name: name || '', email: email || '', hide_gdpr_banner: '1', background_color: '161614', text_color: 'f3efe6', primary_color: 'ff6a1a' });
+    link.href = CALENDLY_URL + '?' + q;   // backup button keeps the prefill too
+    const s = document.createElement('script'); s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true;
+    s.onload = () => {
+      if (!window.Calendly) return;
+      box.classList.add('on'); link.textContent = 'Open calendar in a new tab';
+      link.classList.replace('btn-primary', 'btn-ghost');
+      Calendly.initInlineWidget({ url: CALENDLY_URL + '?hide_gdpr_banner=1&background_color=161614&text_color=f3efe6&primary_color=ff6a1a', parentElement: box, prefill: { name: name || '', email: email || '' } });
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    document.body.appendChild(s);
+  }
+  window.addEventListener('message', e => {
+    if (e.origin === 'https://calendly.com' && e.data && e.data.event === 'calendly.event_scheduled') document.getElementById('calDone').style.display = 'block';
   });
 
   document.getElementById('yr').textContent = new Date().getFullYear();
